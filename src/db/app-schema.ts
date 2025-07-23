@@ -5,8 +5,10 @@ import {
   text,
   timestamp,
   boolean,
+  jsonb,
 } from "drizzle-orm/pg-core"
 import { users } from "./auth-schema"
+import { relations } from "drizzle-orm"
 
 export const projectsTable = pgTable(`projects`, {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -32,3 +34,40 @@ export const todosTable = pgTable(`todos`, {
     .references(() => projectsTable.id, { onDelete: "cascade" }),
   user_ids: text("user_ids").array().notNull().default([]),
 })
+
+export const fileSystemNodes = pgTable("file_system_nodes", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  projectId: integer("project_id")
+    .references(() => projectsTable.id, { onDelete: "cascade" })
+    .notNull(),
+  path: varchar("path", { length: 1000 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  type: varchar("type", { length: 20 }).notNull(),
+  content: text("content"),
+  metadata: jsonb("metadata")
+    .$type<{
+      language?: string
+      encoding?: string
+      size?: number
+      isHidden?: boolean
+      [key: string]: unknown
+    }>()
+    .default({}),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
+  created_at: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp({ withTimezone: true }).defaultNow().notNull(),
+})
+
+export const projectsRelations = relations(projectsTable, ({ many }) => ({
+  fileSystemNodes: many(fileSystemNodes),
+}))
+
+export const fileSystemNodesRelations = relations(
+  fileSystemNodes,
+  ({ one }) => ({
+    project: one(projectsTable, {
+      fields: [fileSystemNodes.projectId],
+      references: [projectsTable.id],
+    }),
+  })
+)

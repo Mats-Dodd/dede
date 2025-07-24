@@ -35,7 +35,7 @@ function ProjectPage() {
   const [newNodeName, setNewNodeName] = useState("")
   const [newNodeType, setNewNodeType] = useState("file")
   const [newNodeContent, setNewNodeContent] = useState("")
-  const [editingNodeId, setEditingNodeId] = useState<number | null>(null)
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({
     path: "",
     name: "",
@@ -130,13 +130,13 @@ function ProjectPage() {
   }
 
   const toggleTodo = (todo: Todo) => {
-    todoCollection.update(todo.id, (draft) => {
+    todoCollection.update(todo.id.toString(), (draft) => {
       draft.completed = !draft.completed
     })
   }
 
   const deleteTodo = (id: number) => {
-    todoCollection.delete(id)
+    todoCollection.delete(id.toString())
   }
 
   // File system node CRUD operations
@@ -164,7 +164,7 @@ function ProjectPage() {
   }
 
   const startEditingNode = (node: FileSystemNode) => {
-    setEditingNodeId(node.id)
+    setEditingNodeId(node.id.toString())
     setEditForm({
       path: node.path,
       name: node.name,
@@ -203,7 +203,7 @@ function ProjectPage() {
   }
 
   const deleteFileSystemNode = (id: number) => {
-    fileSystemNodeCollection.delete(id)
+    fileSystemNodeCollection.delete(id.toString())
   }
 
   if (!project) {
@@ -218,7 +218,7 @@ function ProjectPage() {
           onClick={() => {
             const newName = prompt("Edit project name:", project.name)
             if (newName && newName !== project.name) {
-              projectCollection.update(project.id, (draft) => {
+              projectCollection.update(project.id.toString(), (draft) => {
                 draft.name = newName
               })
             }
@@ -235,7 +235,7 @@ function ProjectPage() {
               project.description || ""
             )
             if (newDescription !== null) {
-              projectCollection.update(project.id, (draft) => {
+              projectCollection.update(project.id.toString(), (draft) => {
                 draft.description = newDescription
               })
             }
@@ -348,7 +348,7 @@ function ProjectPage() {
                 key={node.id}
                 className="p-3 bg-white border border-gray-200 rounded-md shadow-sm"
               >
-                {editingNodeId === node.id ? (
+                {editingNodeId === node.id.toString() ? (
                   // Edit mode
                   <div className="space-y-2">
                     <div className="grid grid-cols-2 gap-2">
@@ -495,15 +495,21 @@ function ProjectPage() {
                       onChange={() => {
                         console.log(`onChange`, { isInProject, isOwner })
                         if (isInProject && !isOwner) {
-                          projectCollection.update(project.id, (draft) => {
-                            draft.sharedUserIds = draft.sharedUserIds.filter(
-                              (id) => id !== user.id
-                            )
-                          })
+                          projectCollection.update(
+                            project.id.toString(),
+                            (draft) => {
+                              draft.sharedUserIds = draft.sharedUserIds.filter(
+                                (id) => id !== user.id
+                              )
+                            }
+                          )
                         } else if (!isInProject) {
-                          projectCollection.update(project.id, (draft) => {
-                            draft.sharedUserIds.push(user.id)
-                          })
+                          projectCollection.update(
+                            project.id.toString(),
+                            (draft) => {
+                              draft.sharedUserIds.push(user.id)
+                            }
+                          )
                         }
                       }}
                       disabled={isOwner}

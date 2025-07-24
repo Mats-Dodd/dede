@@ -34,7 +34,7 @@ export const usersCollection = createCollection(
       },
     },
     schema: selectUsersSchema,
-    getKey: (item) => item.id,
+    getKey: (item) => item.id.toString(),
   })
 )
 export const projectCollection = createCollection(
@@ -61,7 +61,7 @@ export const projectCollection = createCollection(
       },
     },
     schema: selectProjectSchema,
-    getKey: (item) => item.id,
+    getKey: (item) => item.id.toString(),
     onInsert: async ({ transaction }) => {
       const { modified: newProject } = transaction.mutations[0]
       const result = await client.api.projects.$post({
@@ -145,13 +145,14 @@ export const fileSystemNodeCollection = createCollection(
       },
     },
     schema: selectFileSystemNodeSchema,
-    getKey: (item) => item.id,
+    getKey: (item) => item.id.toString(),
     onInsert: async ({ transaction }) => {
       const { modified: newFileSystemNode } = transaction.mutations[0]
       const result = await client.api.fileSystemNodes.$post({
         json: {
           name: newFileSystemNode.name,
           path: newFileSystemNode.path,
+          content: newFileSystemNode.content,
           type: newFileSystemNode.type,
           projectId: newFileSystemNode.projectId,
           userIds: newFileSystemNode.userIds,
@@ -172,6 +173,7 @@ export const fileSystemNodeCollection = createCollection(
         param: { id: updatedFileSystemNode.id },
         json: {
           name: updatedFileSystemNode.name,
+          content: updatedFileSystemNode.content,
           path: updatedFileSystemNode.path,
           type: updatedFileSystemNode.type,
         },
@@ -227,7 +229,7 @@ export const todoCollection = createCollection(
       },
     },
     schema: selectTodoSchema,
-    getKey: (item) => item.id,
+    getKey: (item) => item.id.toString(),
     onInsert: async ({ transaction }) => {
       const { modified: newTodo } = transaction.mutations[0]
       const result = await client.api.todos.$post({

@@ -10,9 +10,13 @@ import {
   selectProjectSchema,
   createProjectSchema,
   updateProjectSchema,
+  fileSystemNodes,
+  selectFileSystemNodeSchema,
+  createFileSystemNodeSchema,
+  updateFileSystemNodeSchema,
 } from "@/db/schema"
 import { users } from "@/db/auth-schema"
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 
 const routes = [
   createCRUDRoutes({
@@ -51,6 +55,22 @@ const routes = [
       create: (_session, _data) => true,
       update: (session, _id, _data) => eq(todosTable.user_id, session.user.id),
       delete: (session, _id) => eq(todosTable.user_id, session.user.id),
+    },
+  }),
+  createCRUDRoutes({
+    table: fileSystemNodes,
+    schema: {
+      select: selectFileSystemNodeSchema,
+      create: createFileSystemNodeSchema,
+      update: updateFileSystemNodeSchema,
+    },
+    basePath: "/api/fileSystemNodes",
+    syncFilter: (session) => `'${session.user.id}' = ANY(user_ids)`,
+    access: {
+      create: (_session, _data) => true,
+      update: (session, _id, _data) =>
+        sql`'${session.user.id}' = ANY(user_ids)`,
+      delete: (session, _id) => sql`'${session.user.id}' = ANY(user_ids)`,
     },
   }),
   // Add sync route - anyone authenticated can sync all users.

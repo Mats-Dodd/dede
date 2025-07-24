@@ -15,6 +15,13 @@
       "when": 1753253933153,
       "tag": "0001_polite_fantastic_four",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1753386707482,
+      "tag": "0002_safe_nicolaos",
+      "breakpoints": true
     }
   ]
 }

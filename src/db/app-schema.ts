@@ -54,6 +54,7 @@ export const fileSystemNodes = pgTable("file_system_nodes", {
     }>()
     .default({}),
   isDeleted: boolean("is_deleted").default(false).notNull(),
+  user_ids: text("user_ids").array().notNull().default([]),
   created_at: timestamp({ withTimezone: true }).notNull().defaultNow(),
   updated_at: timestamp({ withTimezone: true }).defaultNow().notNull(),
 })

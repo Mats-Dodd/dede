@@ -129,9 +129,16 @@ export const fileSystemNodeCollection = createCollection(
           : `http://localhost:5173`
       ).toString(),
       params: {
-        table: "fileSystemNodes",
+        table: "file_system_nodes",
         user_id: async () =>
-          authClient.getSession().then((session) => session.data?.user.id)!,
+          authClient
+            .getSession()
+            .then((session) => session.data?.user.id ?? ""),
+      },
+      parser: {
+        timestamptz: (date: string) => {
+          return new Date(date)
+        },
       },
     },
     schema: selectFileSystemNodeSchema,
@@ -144,6 +151,7 @@ export const fileSystemNodeCollection = createCollection(
           path: newFileSystemNode.path,
           type: newFileSystemNode.type,
           projectId: newFileSystemNode.projectId,
+          user_ids: newFileSystemNode.user_ids,
         },
       })
 

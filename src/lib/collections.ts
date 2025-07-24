@@ -129,13 +129,13 @@ export const fileSystemNodeCollection = createCollection(
           : `http://localhost:5173`
       ).toString(),
       params: {
-        table: "fileSystemNodes",
+        table: '"fileSystemNodes"',
         user_id: async () =>
           authClient
             .getSession()
             .then((session) => session.data?.user.id ?? ""),
         // Cache buster to force new handle after sync filter change
-        v: "4",
+        v: "6",
       },
       parser: {
         timestamptz: (date: string) => {

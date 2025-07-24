@@ -65,7 +65,7 @@ const routes = [
       update: updateFileSystemNodeSchema,
     },
     basePath: "/api/fileSystemNodes",
-    syncFilter: (session) => `"userIds" @> ARRAY['${session.user.id}']`,
+    syncFilter: (session) => `'${session.user.id}' = ANY("userIds")`,
     access: {
       create: (_session, _data) => true,
       update: (session, _id, _data) => sql`${session.user.id} = ANY("userIds")`,

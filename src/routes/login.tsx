@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { authClient } from "@/lib/auth-client"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -13,7 +13,6 @@ function Layout() {
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
-  const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -21,7 +20,7 @@ function Layout() {
     setError("")
 
     try {
-      let { data, error } = await authClient.signUp.email(
+      let { error } = await authClient.signUp.email(
         {
           email,
           password,
@@ -29,14 +28,12 @@ function Layout() {
         },
         {
           onSuccess: () => {
-            console.log(`signed up, navigating`)
             window.location.href = "/"
           },
         }
       )
 
       if (error?.code === `USER_ALREADY_EXISTS`) {
-        console.log(`user exists, logging in`)
         const result = await authClient.signIn.email(
           {
             email,
@@ -44,9 +41,6 @@ function Layout() {
           },
           {
             onSuccess: async () => {
-              console.log(`signed in, navigating`)
-              const { data: session, error } = await authClient.getSession()
-              console.log({ session, error })
               window.location.href = "/"
             },
           }
@@ -56,10 +50,7 @@ function Layout() {
         error = result.error
       }
 
-      console.log({ data, error })
-
       if (error) {
-        console.log(`set error`)
         setError(JSON.stringify(error, null, 4))
       }
     } catch (_) {
@@ -127,11 +118,7 @@ function Layout() {
           )}
 
           <div>
-            <Button
-              type="submit"
-              disabled={isLoading}
-              variant="default"
-            >
+            <Button type="submit" disabled={isLoading} variant="default">
               {isLoading ? "Signing in..." : "Sign in"}
             </Button>
           </div>

@@ -6,8 +6,9 @@ import {
   todoCollection,
   projectCollection,
   usersCollection,
+  fileSystemNodeCollection,
 } from "@/lib/collections"
-import { type Todo } from "@/db/schema"
+import { type Todo, type FileSystemNode } from "@/db/schema"
 import { Button } from "@/components/ui/button"
 
 export const Route = createFileRoute("/_authenticated/project/$projectId")({
@@ -16,6 +17,7 @@ export const Route = createFileRoute("/_authenticated/project/$projectId")({
   loader: async () => {
     await projectCollection.preload()
     await todoCollection.preload()
+    await fileSystemNodeCollection.preload()
     return null
   },
 })
@@ -25,14 +27,37 @@ function ProjectPage() {
   const { data: session } = authClient.useSession()
   const [newTodoText, setNewTodoText] = useState("")
 
+  // File system node form state
+  const [newNodePath, setNewNodePath] = useState("")
+  const [newNodeName, setNewNodeName] = useState("")
+  const [newNodeType, setNewNodeType] = useState("file")
+  const [newNodeContent, setNewNodeContent] = useState("")
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({
+    path: "",
+    name: "",
+    type: "file",
+    content: "",
+  })
+
   const { data: todos } = useLiveQuery(
     (q) =>
       q
         .from({ todoCollection })
         .where(({ todoCollection }) =>
-          eq(todoCollection.project_id, parseInt(projectId, 10))
+          eq(todoCollection.projectId, parseInt(projectId, 10))
         )
-        .orderBy(({ todoCollection }) => todoCollection.created_at),
+        .orderBy(({ todoCollection }) => todoCollection.createdAt),
+    [projectId]
+  )
+
+  const { data: fileSystemNodes } = useLiveQuery(
+    (q) =>
+      q
+        .from({ fileSystemNodeCollection })
+        .where(({ fileSystemNodeCollection }) =>
+          eq(fileSystemNodeCollection.projectId, parseInt(projectId, 10))
+        ),
     [projectId]
   )
 
@@ -45,13 +70,12 @@ function ProjectPage() {
         .from({ projects: projectCollection })
         .where(({ projects }) => eq(projects.id, parseInt(projectId, 10)))
         .fn.select(({ projects }) => ({
-          users: projects.shared_user_ids.concat(projects.owner_id),
-          owner: projects.owner_id,
+          users: projects.sharedUserIds.concat(projects.ownerId),
+          owner: projects.ownerId,
         })),
     [projectId]
   )
   const usersInProject = usersInProjects?.[0]
-  console.log({ usersInProject, users })
 
   const { data: projects } = useLiveQuery(
     (q) =>
@@ -62,31 +86,98 @@ function ProjectPage() {
         ),
     [projectId]
   )
-  const project = projects[0]
+  const project = projects?.[0]
 
   const addTodo = () => {
     if (newTodoText.trim() && session) {
       todoCollection.insert({
-        user_id: session.user.id,
+        userId: session.user.id,
         id: Math.floor(Math.random() * 100000),
         text: newTodoText.trim(),
         completed: false,
-        project_id: parseInt(projectId),
-        user_ids: [],
-        created_at: new Date(),
+        projectId: parseInt(projectId),
+        userIds: [],
+        createdAt: new Date(),
       })
       setNewTodoText("")
     }
   }
 
   const toggleTodo = (todo: Todo) => {
-    todoCollection.update(todo.id, (draft) => {
+    todoCollection.update(todo.id.toString(), (draft) => {
       draft.completed = !draft.completed
     })
   }
 
   const deleteTodo = (id: number) => {
-    todoCollection.delete(id)
+    todoCollection.delete(id.toString())
+  }
+
+  // File system node CRUD operations
+  const addFileSystemNode = () => {
+    if (newNodePath.trim() && newNodeName.trim() && project) {
+      fileSystemNodeCollection.insert({
+        id: Math.floor(Math.random() * 100000),
+        projectId: parseInt(projectId, 10),
+        path: newNodePath.trim(),
+        name: newNodeName.trim(),
+        type: newNodeType,
+        content: newNodeContent.trim() || null,
+        metadata: {},
+        isDeleted: false,
+        userIds: [project.ownerId, ...project.sharedUserIds],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      // Reset form
+      setNewNodePath("")
+      setNewNodeName("")
+      setNewNodeType("file")
+      setNewNodeContent("")
+    }
+  }
+
+  const startEditingNode = (node: FileSystemNode) => {
+    setEditingNodeId(node.id.toString())
+    setEditForm({
+      path: node.path,
+      name: node.name,
+      type: node.type,
+      content: node.content || "",
+    })
+  }
+
+  const saveNodeEdit = () => {
+    if (editingNodeId && editForm.path.trim() && editForm.name.trim()) {
+      fileSystemNodeCollection.update(editingNodeId, (draft) => {
+        draft.path = editForm.path.trim()
+        draft.name = editForm.name.trim()
+        draft.type = editForm.type
+        draft.content = editForm.content.trim() || null
+        draft.updatedAt = new Date()
+      })
+      setEditingNodeId(null)
+      setEditForm({
+        path: "",
+        name: "",
+        type: "file",
+        content: "",
+      })
+    }
+  }
+
+  const cancelEdit = () => {
+    setEditingNodeId(null)
+    setEditForm({
+      path: "",
+      name: "",
+      type: "file",
+      content: "",
+    })
+  }
+
+  const deleteFileSystemNode = (id: number) => {
+    fileSystemNodeCollection.delete(id.toString())
   }
 
   if (!project) {
@@ -101,7 +192,7 @@ function ProjectPage() {
           onClick={() => {
             const newName = prompt("Edit project name:", project.name)
             if (newName && newName !== project.name) {
-              projectCollection.update(project.id, (draft) => {
+              projectCollection.update(project.id.toString(), (draft) => {
                 draft.name = newName
               })
             }
@@ -118,7 +209,7 @@ function ProjectPage() {
               project.description || ""
             )
             if (newDescription !== null) {
-              projectCollection.update(project.id, (draft) => {
+              projectCollection.update(project.id.toString(), (draft) => {
                 draft.description = newDescription
               })
             }
@@ -136,10 +227,7 @@ function ProjectPage() {
             placeholder="Add a new todo..."
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <Button
-            onClick={addTodo}
-            variant="default"
-          >
+          <Button onClick={addTodo} variant="default">
             Add
           </Button>
         </div>
@@ -165,10 +253,7 @@ function ProjectPage() {
               >
                 {todo.text}
               </span>
-              <Button
-                onClick={() => deleteTodo(todo.id)}
-                variant="destructive"
-              >
+              <Button onClick={() => deleteTodo(todo.id)} variant="destructive">
                 Delete
               </Button>
             </li>
@@ -183,18 +268,195 @@ function ProjectPage() {
 
         <hr className="my-8 border-gray-200" />
 
+        {/* File System Nodes Section */}
+        <div>
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">
+            File System Nodes
+          </h3>
+
+          {/* Add new node form */}
+          <div className="mb-4 p-4 bg-gray-50 rounded-md">
+            <h4 className="font-medium text-gray-700 mb-3">Add New Node</h4>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <input
+                type="text"
+                value={newNodePath}
+                onChange={(e) => setNewNodePath(e.target.value)}
+                placeholder="Path (e.g., /src/components)"
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="text"
+                value={newNodeName}
+                onChange={(e) => setNewNodeName(e.target.value)}
+                placeholder="Name (e.g., Button.tsx)"
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <select
+                value={newNodeType}
+                onChange={(e) => setNewNodeType(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="file">File</option>
+                <option value="directory">Directory</option>
+              </select>
+              <Button onClick={addFileSystemNode} variant="default">
+                Add Node
+              </Button>
+            </div>
+            <textarea
+              value={newNodeContent}
+              onChange={(e) => setNewNodeContent(e.target.value)}
+              placeholder="Content (optional)"
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Display existing nodes */}
+          <div className="space-y-2">
+            {fileSystemNodes?.map((node) => (
+              <div
+                key={node.id}
+                className="p-3 bg-white border border-gray-200 rounded-md shadow-sm"
+              >
+                {editingNodeId === node.id.toString() ? (
+                  // Edit mode
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={editForm.path}
+                        onChange={(e) =>
+                          setEditForm((prev) => ({
+                            ...prev,
+                            path: e.target.value,
+                          }))
+                        }
+                        placeholder="Path"
+                        className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        value={editForm.name}
+                        onChange={(e) =>
+                          setEditForm((prev) => ({
+                            ...prev,
+                            name: e.target.value,
+                          }))
+                        }
+                        placeholder="Name"
+                        className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <select
+                      value={editForm.type}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          type: e.target.value,
+                        }))
+                      }
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="file">File</option>
+                      <option value="directory">Directory</option>
+                    </select>
+                    <textarea
+                      value={editForm.content}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          content: e.target.value,
+                        }))
+                      }
+                      placeholder="Content"
+                      rows={2}
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={saveNodeEdit}
+                        variant="default"
+                        size="sm"
+                      >
+                        Save
+                      </Button>
+                      <Button onClick={cancelEdit} variant="outline" size="sm">
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  // Display mode
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-800">
+                          {node.name}
+                        </span>
+                        <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+                          {node.type}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => startEditingNode(node)}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          onClick={() => deleteFileSystemNode(node.id)}
+                          variant="destructive"
+                          size="sm"
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-1">
+                      <strong>Path:</strong> {node.path}
+                    </p>
+                    {node.content && (
+                      <p className="text-sm text-gray-600">
+                        <strong>Content:</strong>{" "}
+                        {node.content.substring(0, 100)}
+                        {node.content.length > 100 ? "..." : ""}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {(!fileSystemNodes || fileSystemNodes.length === 0) && (
+            <div className="text-center py-8">
+              <p className="text-gray-500">
+                No file system nodes yet. Add one above!
+              </p>
+            </div>
+          )}
+        </div>
+
+        <hr className="my-8 border-gray-200" />
+
         <div>
           <h3 className="text-lg font-semibold text-gray-800 mb-3">
             Project Members
           </h3>
           <div className="space-y-2">
-            {(session?.user.id === project.owner_id
+            {(session?.user.id === project.ownerId
               ? users
               : users?.filter((user) => usersInProject?.users.includes(user.id))
             )?.map((user) => {
               const isInProject = usersInProject?.users.includes(user.id)
               const isOwner = user.id === usersInProject?.owner
-              const canEditMembership = session?.user.id === project.owner_id
+              const canEditMembership = session?.user.id === project.ownerId
               return (
                 <div
                   key={user.id}
@@ -205,18 +467,22 @@ function ProjectPage() {
                       type="checkbox"
                       checked={isInProject}
                       onChange={() => {
-                        console.log(`onChange`, { isInProject, isOwner })
                         if (isInProject && !isOwner) {
-                          projectCollection.update(project.id, (draft) => {
-                            draft.shared_user_ids =
-                              draft.shared_user_ids.filter(
+                          projectCollection.update(
+                            project.id.toString(),
+                            (draft) => {
+                              draft.sharedUserIds = draft.sharedUserIds.filter(
                                 (id) => id !== user.id
                               )
-                          })
+                            }
+                          )
                         } else if (!isInProject) {
-                          projectCollection.update(project.id, (draft) => {
-                            draft.shared_user_ids.push(user.id)
-                          })
+                          projectCollection.update(
+                            project.id.toString(),
+                            (draft) => {
+                              draft.sharedUserIds.push(user.id)
+                            }
+                          )
                         }
                       }}
                       disabled={isOwner}

@@ -2,15 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router"
 import { useEffect, useState } from "react"
 import { Outlet } from "@tanstack/react-router"
 import { authClient } from "@/lib/auth-client"
-import {
-  useLiveQuery,
-  createCollection,
-  liveQueryCollectionOptions,
-  createLiveQueryCollection,
-  not,
-  like,
-  count,
-} from "@tanstack/react-db"
+import { useLiveQuery } from "@tanstack/react-db"
 import { projectCollection } from "@/lib/collections"
 import { Button } from "@/components/ui/button"
 
@@ -21,29 +13,10 @@ export const Route = createFileRoute("/_authenticated")({
 
 function AuthenticatedLayout() {
   const { data: session, isPending } = authClient.useSession()
-  console.log({ session, isPending })
   const navigate = useNavigate()
   const [showNewProjectForm, setShowNewProjectForm] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
 
-  const countQuery = createLiveQueryCollection({
-    query: (q) =>
-      q.from({ projects: projectCollection }).select(({ projects }) => ({
-        count: count(projects.id),
-      })),
-  })
-  const newQuery = createCollection(
-    liveQueryCollectionOptions({
-      query: (q) =>
-        q
-          .from({ projects: projectCollection })
-          .where(({ projects }) => not(like(projects.name, `Default`))),
-    })
-  )
-
-  const { data: notDefault } = useLiveQuery(newQuery)
-  const { data: countData } = useLiveQuery(countQuery)
-  console.log({ notDefault, countData })
   const { data: projects, isLoading } = useLiveQuery((q) =>
     q.from({ projectCollection })
   )
@@ -64,9 +37,9 @@ function AuthenticatedLayout() {
           id: Math.floor(Math.random() * 100000),
           name: "Default",
           description: "Default project",
-          owner_id: session.user.id,
-          shared_user_ids: [],
-          created_at: new Date(),
+          ownerId: session.user.id,
+          sharedUserIds: [],
+          createdAt: new Date(),
         })
       }
     }
@@ -83,9 +56,9 @@ function AuthenticatedLayout() {
         id: Math.floor(Math.random() * 100000),
         name: newProjectName.trim(),
         description: "",
-        owner_id: session.user.id,
-        shared_user_ids: [],
-        created_at: new Date(),
+        ownerId: session.user.id,
+        sharedUserIds: [],
+        createdAt: new Date(),
       })
       setNewProjectName("")
       setShowNewProjectForm(false)
@@ -114,10 +87,7 @@ function AuthenticatedLayout() {
               <span className="text-sm text-gray-700">
                 {session.user.email}
               </span>
-              <Button
-                onClick={handleLogout}
-                variant="ghost"
-              >
+              <Button onClick={handleLogout} variant="ghost">
                 Sign out
               </Button>
             </div>
@@ -160,10 +130,7 @@ function AuthenticatedLayout() {
                   className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                 />
                 <div className="flex gap-2 mt-2">
-                  <Button
-                    onClick={handleCreateProject}
-                    variant="default"
-                  >
+                  <Button onClick={handleCreateProject} variant="default">
                     Create
                   </Button>
                   <Button

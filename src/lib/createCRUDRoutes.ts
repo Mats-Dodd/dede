@@ -195,12 +195,14 @@ export function createCRUDRoutes(config: CRUDConfig) {
         path: basePath,
         method: "post",
         request: {
+          //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           body: jsonContentRequired(schema?.create, "The item to create"),
         },
         responses: {
           [HttpStatusCodes.OK]: jsonContent(
             z.object({
               txid: z.string(),
+              //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
               item: schema?.select,
             }),
             "The created item"
@@ -212,11 +214,13 @@ export function createCRUDRoutes(config: CRUDConfig) {
         },
       }),
       async (c) => {
+        //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const session = await auth.api.getSession({ headers: c.req.header() })
         if (!session) {
           return c.json({ error: "Unauthorized" }, HttpStatusCodes.UNAUTHORIZED)
         }
 
+        //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const body = c.req.valid("json")
 
         try {
@@ -224,11 +228,13 @@ export function createCRUDRoutes(config: CRUDConfig) {
             access.create(session, body)
           }
         } catch (error) {
+          //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           return c.json({ error: error.message }, HttpStatusCodes.FORBIDDEN)
         }
 
         const result = await db.transaction(async (tx) => {
           const txid = await generateTxId(tx)
+          //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           const [newItem] = await tx.insert(table).values(body).returning()
           return { item: newItem, txid }
         })
@@ -242,12 +248,14 @@ export function createCRUDRoutes(config: CRUDConfig) {
         method: "put",
         request: {
           params: IdParamsSchema,
+          //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           body: jsonContentRequired(schema?.update, "The item to update"),
         },
         responses: {
           [HttpStatusCodes.OK]: jsonContent(
             z.object({
               txid: z.string(),
+              //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
               item: schema?.select,
             }),
             "The updated item"
@@ -257,18 +265,22 @@ export function createCRUDRoutes(config: CRUDConfig) {
             HttpStatusPhrases.NOT_FOUND
           ),
           [HttpStatusCodes.UNPROCESSABLE_ENTITY]: jsonContent(
+            //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
             createErrorSchema(schema?.update ?? z.string()),
             "The validation error(s)"
           ),
         },
       }),
       async (c) => {
+        //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const session = await auth.api.getSession({ headers: c.req.header() })
         if (!session) {
           return c.json({ error: "Unauthorized" }, HttpStatusCodes.UNAUTHORIZED)
         }
 
+        //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const { id } = c.req.valid("param")
+        //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const body = c.req.valid("json")
 
         let whereCondition = eq(table.id, id)
@@ -277,10 +289,12 @@ export function createCRUDRoutes(config: CRUDConfig) {
           if (access?.update) {
             const accessResult = access.update(session, id, body)
             if (accessResult !== true) {
+              //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
               whereCondition = and(whereCondition, accessResult)
             }
           }
         } catch (error) {
+          //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           return c.json({ error: error.message }, HttpStatusCodes.FORBIDDEN)
         }
 
@@ -315,6 +329,7 @@ export function createCRUDRoutes(config: CRUDConfig) {
           [HttpStatusCodes.OK]: jsonContent(
             z.object({
               txid: z.string(),
+              //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
               item: schema?.select,
             }),
             "The deleted item"
@@ -325,6 +340,7 @@ export function createCRUDRoutes(config: CRUDConfig) {
         },
       }),
       async (c) => {
+        //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const session = await auth.api.getSession({ headers: c.req.header() })
         if (!session) {
           return c.json({ error: "Unauthorized" }, HttpStatusCodes.UNAUTHORIZED)
@@ -338,10 +354,12 @@ export function createCRUDRoutes(config: CRUDConfig) {
           if (access?.delete) {
             const accessResult = access.delete(session, id)
             if (accessResult !== true) {
+              //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
               whereCondition = and(whereCondition, accessResult)
             }
           }
         } catch (error) {
+          //eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           return c.json({ error: error.message }, HttpStatusCodes.FORBIDDEN)
         }
 

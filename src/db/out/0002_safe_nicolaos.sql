@@ -1,0 +1,1 @@
+ALTER TABLE "file_system_nodes" ADD COLUMN "user_ids" text[] DEFAULT '{}' NOT NULL;

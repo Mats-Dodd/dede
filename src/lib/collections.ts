@@ -5,6 +5,7 @@ import {
   selectTodoSchema,
   selectProjectSchema,
   selectUsersSchema,
+  selectFileSystemNodeSchema,
 } from "@/db/schema"
 import { getClient } from "@/api-client"
 const client = getClient()
@@ -104,6 +105,79 @@ export const projectCollection = createCollection(
       const { original: deletedProject } = transaction.mutations[0]
       const result = await client.api.projects[":id"].$delete({
         param: { id: deletedProject.id },
+      })
+
+      if (result.ok) {
+        const data = await result.json()
+        return { txid: data.txid }
+      } else {
+        const errorData = await result.json()
+        throw new Error(JSON.stringify(errorData))
+      }
+    },
+  })
+)
+
+export const fileSystemNodeCollection = createCollection(
+  electricCollectionOptions({
+    id: "fileSystemNodes",
+    shapeOptions: {
+      url: new URL(
+        `/api/fileSystemNodes`,
+        typeof window !== `undefined`
+          ? window.location.origin
+          : `http://localhost:5173`
+      ).toString(),
+      params: {
+        table: "fileSystemNodes",
+        user_id: async () =>
+          authClient.getSession().then((session) => session.data?.user.id)!,
+      },
+    },
+    schema: selectFileSystemNodeSchema,
+    getKey: (item) => item.id,
+    onInsert: async ({ transaction }) => {
+      const { modified: newFileSystemNode } = transaction.mutations[0]
+      const result = await client.api.fileSystemNodes.$post({
+        json: {
+          name: newFileSystemNode.name,
+          path: newFileSystemNode.path,
+          type: newFileSystemNode.type,
+          projectId: newFileSystemNode.projectId,
+        },
+      })
+
+      if (result.ok) {
+        const data = await result.json()
+        return { txid: data.txid }
+      } else {
+        const errorData = await result.json()
+        throw new Error(JSON.stringify(errorData))
+      }
+    },
+    onUpdate: async ({ transaction }) => {
+      const { modified: updatedFileSystemNode } = transaction.mutations[0]
+      const result = await client.api.fileSystemNodes[":id"].$put({
+        param: { id: updatedFileSystemNode.id },
+        json: {
+          name: updatedFileSystemNode.name,
+          path: updatedFileSystemNode.path,
+          type: updatedFileSystemNode.type,
+        },
+      })
+
+      if (result.ok) {
+        const data = await result.json()
+        return { txid: data.txid }
+      } else {
+        const errorData = await result.json()
+        throw new Error(JSON.stringify(errorData))
+      }
+    },
+    onDelete: async ({ transaction }) => {
+      const { original: deletedFileSystemNode } = transaction.mutations[0]
+      const result = await client.api.fileSystemNodes[":id"].$delete({
+        param: { id: deletedFileSystemNode.id },
       })
 
       if (result.ok) {

@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"docker compose up\" \"vite dev\" --kill-others --kill-others-on-fail",
+    "dev": "vite dev",
     "start": "node .output/server/index.mjs",
     "build": "vite build",
     "db:generate": "drizzle-kit generate",

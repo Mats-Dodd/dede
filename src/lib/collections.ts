@@ -68,8 +68,8 @@ export const projectCollection = createCollection(
         json: {
           name: newProject.name,
           description: newProject.description,
-          owner_id: newProject.owner_id,
-          shared_user_ids: newProject.shared_user_ids,
+          ownerId: newProject.ownerId,
+          sharedUserIds: newProject.sharedUserIds,
         },
       })
 
@@ -90,7 +90,7 @@ export const projectCollection = createCollection(
         json: {
           name: updatedProject.name,
           description: updatedProject.description,
-          shared_user_ids: updatedProject.shared_user_ids,
+          sharedUserIds: updatedProject.sharedUserIds,
         },
       })
       if (result.ok) {
@@ -129,13 +129,13 @@ export const fileSystemNodeCollection = createCollection(
           : `http://localhost:5173`
       ).toString(),
       params: {
-        table: "file_system_nodes",
+        table: "fileSystemNodes",
         user_id: async () =>
           authClient
             .getSession()
             .then((session) => session.data?.user.id ?? ""),
         // Cache buster to force new handle after sync filter change
-        v: "3",
+        v: "4",
       },
       parser: {
         timestamptz: (date: string) => {
@@ -154,7 +154,7 @@ export const fileSystemNodeCollection = createCollection(
           path: newFileSystemNode.path,
           type: newFileSystemNode.type,
           projectId: newFileSystemNode.projectId,
-          user_ids: newFileSystemNode.user_ids,
+          userIds: newFileSystemNode.userIds,
         },
       })
 
@@ -232,10 +232,10 @@ export const todoCollection = createCollection(
       const { modified: newTodo } = transaction.mutations[0]
       const result = await client.api.todos.$post({
         json: {
-          user_id: newTodo.user_id,
+          userId: newTodo.userId,
           text: newTodo.text,
           completed: newTodo.completed,
-          project_id: newTodo.project_id,
+          projectId: newTodo.projectId,
         },
       })
 

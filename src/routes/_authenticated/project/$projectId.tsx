@@ -27,6 +27,9 @@ function ProjectPage() {
   const { data: session } = authClient.useSession()
   const [newTodoText, setNewTodoText] = useState("")
 
+  console.log("[DEBUG] ProjectPage render - projectId:", projectId)
+  console.log("[DEBUG] Session:", session)
+
   // File system node form state
   const [newNodePath, setNewNodePath] = useState("")
   const [newNodeName, setNewNodeName] = useState("")
@@ -45,10 +48,15 @@ function ProjectPage() {
       q
         .from({ todoCollection })
         .where(({ todoCollection }) =>
-          eq(todoCollection.project_id, parseInt(projectId, 10))
+          eq(todoCollection.projectId, parseInt(projectId, 10))
         )
-        .orderBy(({ todoCollection }) => todoCollection.created_at),
+        .orderBy(({ todoCollection }) => todoCollection.createdAt),
     [projectId]
+  )
+  console.log("[DEBUG] Todos query result:", todos)
+  console.log(
+    "[DEBUG] All todoCollection data:",
+    Array.from(todoCollection.values())
   )
 
   const { data: fileSystemNodes } = useLiveQuery(
@@ -56,7 +64,7 @@ function ProjectPage() {
       q
         .from({ fileSystemNodeCollection })
         .where(({ fileSystemNodeCollection }) =>
-          eq(fileSystemNodeCollection.project_id, parseInt(projectId, 10))
+          eq(fileSystemNodeCollection.projectId, parseInt(projectId, 10))
         ),
     [projectId]
   )
@@ -70,14 +78,19 @@ function ProjectPage() {
   const { data: users } = useLiveQuery((q) =>
     q.from({ users: usersCollection })
   )
+  console.log("[DEBUG] Users query result:", users)
+  console.log(
+    "[DEBUG] All usersCollection data:",
+    Array.from(usersCollection.values())
+  )
   const { data: usersInProjects } = useLiveQuery(
     (q) =>
       q
         .from({ projects: projectCollection })
         .where(({ projects }) => eq(projects.id, parseInt(projectId, 10)))
         .fn.select(({ projects }) => ({
-          users: projects.shared_user_ids.concat(projects.owner_id),
-          owner: projects.owner_id,
+          users: projects.sharedUserIds.concat(projects.ownerId),
+          owner: projects.ownerId,
         })),
     [projectId]
   )
@@ -93,18 +106,24 @@ function ProjectPage() {
         ),
     [projectId]
   )
-  const project = projects[0]
+  console.log("[DEBUG] Projects query result:", projects)
+  console.log(
+    "[DEBUG] All projectCollection data:",
+    Array.from(projectCollection.values())
+  )
+  const project = projects?.[0]
+  console.log("[DEBUG] Selected project:", project)
 
   const addTodo = () => {
     if (newTodoText.trim() && session) {
       todoCollection.insert({
-        user_id: session.user.id,
+        userId: session.user.id,
         id: Math.floor(Math.random() * 100000),
         text: newTodoText.trim(),
         completed: false,
-        project_id: parseInt(projectId),
-        user_ids: [],
-        created_at: new Date(),
+        projectId: parseInt(projectId),
+        userIds: [],
+        createdAt: new Date(),
       })
       setNewTodoText("")
     }
@@ -132,9 +151,9 @@ function ProjectPage() {
         content: newNodeContent.trim() || null,
         metadata: {},
         isDeleted: false,
-        user_ids: [project.owner_id, ...project.shared_user_ids],
-        created_at: new Date(),
-        updated_at: new Date(),
+        userIds: [project.ownerId, ...project.sharedUserIds],
+        createdAt: new Date(),
+        updatedAt: new Date(),
       })
       // Reset form
       setNewNodePath("")
@@ -161,7 +180,7 @@ function ProjectPage() {
         draft.name = editForm.name.trim()
         draft.type = editForm.type
         draft.content = editForm.content.trim() || null
-        draft.updated_at = new Date()
+        draft.updatedAt = new Date()
       })
       setEditingNodeId(null)
       setEditForm({
@@ -457,13 +476,13 @@ function ProjectPage() {
             Project Members
           </h3>
           <div className="space-y-2">
-            {(session?.user.id === project.owner_id
+            {(session?.user.id === project.ownerId
               ? users
               : users?.filter((user) => usersInProject?.users.includes(user.id))
             )?.map((user) => {
               const isInProject = usersInProject?.users.includes(user.id)
               const isOwner = user.id === usersInProject?.owner
-              const canEditMembership = session?.user.id === project.owner_id
+              const canEditMembership = session?.user.id === project.ownerId
               return (
                 <div
                   key={user.id}
@@ -477,14 +496,13 @@ function ProjectPage() {
                         console.log(`onChange`, { isInProject, isOwner })
                         if (isInProject && !isOwner) {
                           projectCollection.update(project.id, (draft) => {
-                            draft.shared_user_ids =
-                              draft.shared_user_ids.filter(
-                                (id) => id !== user.id
-                              )
+                            draft.sharedUserIds = draft.sharedUserIds.filter(
+                              (id) => id !== user.id
+                            )
                           })
                         } else if (!isInProject) {
                           projectCollection.update(project.id, (draft) => {
-                            draft.shared_user_ids.push(user.id)
+                            draft.sharedUserIds.push(user.id)
                           })
                         }
                       }}

@@ -28,18 +28,18 @@ const routes = [
     },
     basePath: "/api/projects",
     syncFilter: (session) =>
-      `owner_id = '${session.user.id}' OR '${session.user.id}' = ANY(shared_user_ids)`,
+      `"ownerId" = '${session.user.id}' OR '${session.user.id}' = ANY("sharedUserIds")`,
     access: {
       create: (session, data) => {
-        if (data.owner_id === session.user.id) {
+        if (data.ownerId === session.user.id) {
           return true
         } else {
           throw new Error(`You can only create projects you own`)
         }
       },
       update: (session, _id, _data) =>
-        eq(projectsTable.owner_id, session.user.id),
-      delete: (session, _id) => eq(projectsTable.owner_id, session.user.id),
+        eq(projectsTable.ownerId, session.user.id),
+      delete: (session, _id) => eq(projectsTable.ownerId, session.user.id),
     },
   }),
   createCRUDRoutes({
@@ -50,11 +50,11 @@ const routes = [
       update: updateTodoSchema,
     },
     basePath: "/api/todos",
-    syncFilter: (session) => `'${session.user.id}' = ANY(user_ids)`,
+    syncFilter: (session) => `'${session.user.id}' = ANY("userIds")`,
     access: {
       create: (_session, _data) => true,
-      update: (session, _id, _data) => eq(todosTable.user_id, session.user.id),
-      delete: (session, _id) => eq(todosTable.user_id, session.user.id),
+      update: (session, _id, _data) => eq(todosTable.userId, session.user.id),
+      delete: (session, _id) => eq(todosTable.userId, session.user.id),
     },
   }),
   createCRUDRoutes({
@@ -65,11 +65,11 @@ const routes = [
       update: updateFileSystemNodeSchema,
     },
     basePath: "/api/fileSystemNodes",
-    syncFilter: (session) => `user_ids @> ARRAY['${session.user.id}']`,
+    syncFilter: (session) => `"userIds" @> ARRAY['${session.user.id}']`,
     access: {
       create: (_session, _data) => true,
-      update: (session, _id, _data) => sql`${session.user.id} = ANY(user_ids)`,
-      delete: (session, _id) => sql`${session.user.id} = ANY(user_ids)`,
+      update: (session, _id, _data) => sql`${session.user.id} = ANY("userIds")`,
+      delete: (session, _id) => sql`${session.user.id} = ANY("userIds")`,
     },
   }),
   // Add sync route - anyone authenticated can sync all users.

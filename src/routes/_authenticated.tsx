@@ -64,9 +64,9 @@ function AuthenticatedLayout() {
           id: Math.floor(Math.random() * 100000),
           name: "Default",
           description: "Default project",
-          owner_id: session.user.id,
-          shared_user_ids: [],
-          created_at: new Date(),
+          ownerId: session.user.id,
+          sharedUserIds: [],
+          createdAt: new Date(),
         })
       }
     }
@@ -83,9 +83,9 @@ function AuthenticatedLayout() {
         id: Math.floor(Math.random() * 100000),
         name: newProjectName.trim(),
         description: "",
-        owner_id: session.user.id,
-        shared_user_ids: [],
-        created_at: new Date(),
+        ownerId: session.user.id,
+        sharedUserIds: [],
+        createdAt: new Date(),
       })
       setNewProjectName("")
       setShowNewProjectForm(false)
@@ -114,10 +114,7 @@ function AuthenticatedLayout() {
               <span className="text-sm text-gray-700">
                 {session.user.email}
               </span>
-              <Button
-                onClick={handleLogout}
-                variant="ghost"
-              >
+              <Button onClick={handleLogout} variant="ghost">
                 Sign out
               </Button>
             </div>
@@ -160,10 +157,7 @@ function AuthenticatedLayout() {
                   className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                 />
                 <div className="flex gap-2 mt-2">
-                  <Button
-                    onClick={handleCreateProject}
-                    variant="default"
-                  >
+                  <Button onClick={handleCreateProject} variant="default">
                     Create
                   </Button>
                   <Button

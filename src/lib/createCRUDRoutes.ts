@@ -175,13 +175,10 @@ export function createCRUDRoutes(config: CRUDConfig) {
 
         if (syncFilter) {
           const filter = syncFilter(session)
-          console.log(`[DEBUG] syncFilter for ${basePath}:`, filter)
           originUrl.searchParams.set("where", filter)
         }
 
-        console.log(`[DEBUG] Electric request URL:`, originUrl.toString())
         const response = await fetch(originUrl)
-        console.log(`[DEBUG] Electric response status:`, response.status)
         const headers = new Headers(response.headers)
         headers.delete(`content-encoding`)
         headers.delete(`content-length`)

@@ -2,15 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router"
 import { useEffect, useState } from "react"
 import { Outlet } from "@tanstack/react-router"
 import { authClient } from "@/lib/auth-client"
-import {
-  useLiveQuery,
-  createCollection,
-  liveQueryCollectionOptions,
-  createLiveQueryCollection,
-  not,
-  like,
-  count,
-} from "@tanstack/react-db"
+import { useLiveQuery } from "@tanstack/react-db"
 import { projectCollection } from "@/lib/collections"
 import { Button } from "@/components/ui/button"
 
@@ -21,29 +13,10 @@ export const Route = createFileRoute("/_authenticated")({
 
 function AuthenticatedLayout() {
   const { data: session, isPending } = authClient.useSession()
-  console.log({ session, isPending })
   const navigate = useNavigate()
   const [showNewProjectForm, setShowNewProjectForm] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
 
-  const countQuery = createLiveQueryCollection({
-    query: (q) =>
-      q.from({ projects: projectCollection }).select(({ projects }) => ({
-        count: count(projects.id),
-      })),
-  })
-  const newQuery = createCollection(
-    liveQueryCollectionOptions({
-      query: (q) =>
-        q
-          .from({ projects: projectCollection })
-          .where(({ projects }) => not(like(projects.name, `Default`))),
-    })
-  )
-
-  const { data: notDefault } = useLiveQuery(newQuery)
-  const { data: countData } = useLiveQuery(countQuery)
-  console.log({ notDefault, countData })
   const { data: projects, isLoading } = useLiveQuery((q) =>
     q.from({ projectCollection })
   )

@@ -7,10 +7,8 @@ export const Route = createFileRoute(`/_authenticated/`)({
   component: IndexRedirect,
   ssr: false,
   loader: async () => {
-    console.log(1)
     await projectCollection.preload()
     await todoCollection.preload()
-    console.log(2)
     return null
   },
 })

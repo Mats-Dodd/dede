@@ -142,7 +142,6 @@ export const fileSystemNodeCollection = createCollection(
       },
       parser: {
         timestamptz: (date: string) => {
-          console.log("[DEBUG] Parsing timestamptz:", date)
           return new Date(date)
         },
       },
@@ -272,7 +271,6 @@ export const todoCollection = createCollection(
       })
       if (result.ok) {
         const data = await result.json()
-        console.log(data, typeof data.txid)
         return { txid: data.txid }
       } else {
         const errorData = await result.json()

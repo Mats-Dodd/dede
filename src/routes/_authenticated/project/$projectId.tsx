@@ -27,9 +27,6 @@ function ProjectPage() {
   const { data: session } = authClient.useSession()
   const [newTodoText, setNewTodoText] = useState("")
 
-  console.log("[DEBUG] ProjectPage render - projectId:", projectId)
-  console.log("[DEBUG] Session:", session)
-
   // File system node form state
   const [newNodePath, setNewNodePath] = useState("")
   const [newNodeName, setNewNodeName] = useState("")
@@ -53,11 +50,6 @@ function ProjectPage() {
         .orderBy(({ todoCollection }) => todoCollection.createdAt),
     [projectId]
   )
-  console.log("[DEBUG] Todos query result:", todos)
-  console.log(
-    "[DEBUG] All todoCollection data:",
-    Array.from(todoCollection.values())
-  )
 
   const { data: fileSystemNodes } = useLiveQuery(
     (q) =>
@@ -69,19 +61,8 @@ function ProjectPage() {
     [projectId]
   )
 
-  console.log("[DEBUG] fileSystemNodes from query:", fileSystemNodes)
-  console.log(
-    "[DEBUG] Raw fileSystemNodeCollection data:",
-    JSON.stringify(fileSystemNodeCollection, null, 2)
-  )
-
   const { data: users } = useLiveQuery((q) =>
     q.from({ users: usersCollection })
-  )
-  console.log("[DEBUG] Users query result:", users)
-  console.log(
-    "[DEBUG] All usersCollection data:",
-    Array.from(usersCollection.values())
   )
   const { data: usersInProjects } = useLiveQuery(
     (q) =>
@@ -95,7 +76,6 @@ function ProjectPage() {
     [projectId]
   )
   const usersInProject = usersInProjects?.[0]
-  console.log({ usersInProject, users })
 
   const { data: projects } = useLiveQuery(
     (q) =>
@@ -106,13 +86,7 @@ function ProjectPage() {
         ),
     [projectId]
   )
-  console.log("[DEBUG] Projects query result:", projects)
-  console.log(
-    "[DEBUG] All projectCollection data:",
-    Array.from(projectCollection.values())
-  )
   const project = projects?.[0]
-  console.log("[DEBUG] Selected project:", project)
 
   const addTodo = () => {
     if (newTodoText.trim() && session) {
@@ -493,7 +467,6 @@ function ProjectPage() {
                       type="checkbox"
                       checked={isInProject}
                       onChange={() => {
-                        console.log(`onChange`, { isInProject, isOwner })
                         if (isInProject && !isOwner) {
                           projectCollection.update(
                             project.id.toString(),

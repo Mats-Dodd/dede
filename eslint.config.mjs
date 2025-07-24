@@ -14,6 +14,7 @@ export default [
   includeIgnoreFile(gitignorePath, "Imported .gitignore patterns"),
   {
     files: ["src/**/*.{js,jsx,ts,tsx,mjs}"],
+    ignores: ["src/lib/createCRUDRoutes.ts"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: `module`,

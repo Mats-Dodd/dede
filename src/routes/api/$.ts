@@ -65,12 +65,11 @@ const routes = [
       update: updateFileSystemNodeSchema,
     },
     basePath: "/api/fileSystemNodes",
-    syncFilter: (session) => `'${session.user.id}' = ANY(user_ids)`,
+    syncFilter: (session) => `user_ids @> ARRAY['${session.user.id}']`,
     access: {
       create: (_session, _data) => true,
-      update: (session, _id, _data) =>
-        sql`'${session.user.id}' = ANY(user_ids)`,
-      delete: (session, _id) => sql`'${session.user.id}' = ANY(user_ids)`,
+      update: (session, _id, _data) => sql`${session.user.id} = ANY(user_ids)`,
+      delete: (session, _id) => sql`${session.user.id} = ANY(user_ids)`,
     },
   }),
   // Add sync route - anyone authenticated can sync all users.

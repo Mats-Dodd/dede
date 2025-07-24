@@ -56,9 +56,15 @@ function ProjectPage() {
       q
         .from({ fileSystemNodeCollection })
         .where(({ fileSystemNodeCollection }) =>
-          eq(fileSystemNodeCollection.projectId, parseInt(projectId, 10))
+          eq(fileSystemNodeCollection.project_id, parseInt(projectId, 10))
         ),
     [projectId]
+  )
+
+  console.log("[DEBUG] fileSystemNodes from query:", fileSystemNodes)
+  console.log(
+    "[DEBUG] Raw fileSystemNodeCollection data:",
+    JSON.stringify(fileSystemNodeCollection, null, 2)
   )
 
   const { data: users } = useLiveQuery((q) =>

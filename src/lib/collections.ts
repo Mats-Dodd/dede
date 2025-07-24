@@ -134,9 +134,12 @@ export const fileSystemNodeCollection = createCollection(
           authClient
             .getSession()
             .then((session) => session.data?.user.id ?? ""),
+        // Cache buster to force new handle after sync filter change
+        v: "3",
       },
       parser: {
         timestamptz: (date: string) => {
+          console.log("[DEBUG] Parsing timestamptz:", date)
           return new Date(date)
         },
       },

@@ -45,6 +45,7 @@ function ProjectPage() {
         ),
     [projectId]
   )
+  console.log(JSON.stringify(fileSystemNodes))
 
   const { data: users } = useLiveQuery((q) =>
     q.from({ users: usersCollection })

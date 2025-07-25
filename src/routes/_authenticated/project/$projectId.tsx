@@ -3,12 +3,11 @@ import { useLiveQuery, eq } from "@tanstack/react-db"
 import { useState } from "react"
 import { authClient } from "@/lib/auth-client"
 import {
-  todoCollection,
   projectCollection,
   usersCollection,
   fileSystemNodeCollection,
 } from "@/lib/collections"
-import { type Todo, type FileSystemNode } from "@/db/schema"
+import { type FileSystemNode } from "@/db/schema"
 import { Button } from "@/components/ui/button"
 
 export const Route = createFileRoute("/_authenticated/project/$projectId")({
@@ -16,7 +15,6 @@ export const Route = createFileRoute("/_authenticated/project/$projectId")({
   ssr: false,
   loader: async () => {
     await projectCollection.preload()
-    await todoCollection.preload()
     await fileSystemNodeCollection.preload()
     return null
   },
@@ -25,8 +23,6 @@ export const Route = createFileRoute("/_authenticated/project/$projectId")({
 function ProjectPage() {
   const { projectId } = Route.useParams()
   const { data: session } = authClient.useSession()
-  const [newTodoText, setNewTodoText] = useState("")
-
   // File system node form state
   const [newNodePath, setNewNodePath] = useState("")
   const [newNodeName, setNewNodeName] = useState("")
@@ -39,17 +35,6 @@ function ProjectPage() {
     type: "file",
     content: "",
   })
-
-  const { data: todos } = useLiveQuery(
-    (q) =>
-      q
-        .from({ todoCollection })
-        .where(({ todoCollection }) =>
-          eq(todoCollection.projectId, parseInt(projectId, 10))
-        )
-        .orderBy(({ todoCollection }) => todoCollection.createdAt),
-    [projectId]
-  )
 
   const { data: fileSystemNodes } = useLiveQuery(
     (q) =>
@@ -87,31 +72,6 @@ function ProjectPage() {
     [projectId]
   )
   const project = projects?.[0]
-
-  const addTodo = () => {
-    if (newTodoText.trim() && session) {
-      todoCollection.insert({
-        userId: session.user.id,
-        id: Math.floor(Math.random() * 100000),
-        text: newTodoText.trim(),
-        completed: false,
-        projectId: parseInt(projectId),
-        userIds: [],
-        createdAt: new Date(),
-      })
-      setNewTodoText("")
-    }
-  }
-
-  const toggleTodo = (todo: Todo) => {
-    todoCollection.update(todo.id.toString(), (draft) => {
-      draft.completed = !draft.completed
-    })
-  }
-
-  const deleteTodo = (id: number) => {
-    todoCollection.delete(id.toString())
-  }
 
   // File system node CRUD operations
   const addFileSystemNode = () => {
@@ -217,54 +177,6 @@ function ProjectPage() {
         >
           {project.description || "Click to add description..."}
         </p>
-
-        <div className="flex gap-2 mb-4">
-          <input
-            type="text"
-            value={newTodoText}
-            onChange={(e) => setNewTodoText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addTodo()}
-            placeholder="Add a new todo..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <Button onClick={addTodo} variant="default">
-            Add
-          </Button>
-        </div>
-
-        <ul className="space-y-2">
-          {todos?.map((todo) => (
-            <li
-              key={todo.id}
-              className="flex items-center gap-2 p-3 bg-white border border-gray-200 rounded-md shadow-sm"
-            >
-              <input
-                type="checkbox"
-                checked={todo.completed}
-                onChange={() => toggleTodo(todo)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <span
-                className={`flex-1 ${
-                  todo.completed
-                    ? "line-through text-gray-500"
-                    : "text-gray-800"
-                }`}
-              >
-                {todo.text}
-              </span>
-              <Button onClick={() => deleteTodo(todo.id)} variant="destructive">
-                Delete
-              </Button>
-            </li>
-          ))}
-        </ul>
-
-        {(!todos || todos.length === 0) && (
-          <div className="text-center py-8">
-            <p className="text-gray-500">No todos yet. Add one above!</p>
-          </div>
-        )}
 
         <hr className="my-8 border-gray-200" />
 

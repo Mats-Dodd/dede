@@ -12,23 +12,9 @@ export const Route = createFileRoute("/_authenticated/project/$projectId")({
 function ProjectPage() {
   const { selectedFileNode } = useFileContext()
 
-  console.log("📄 Project page - selectedFileNode:", selectedFileNode)
-  console.log(
-    "📄 Project page - fileContent:",
-    selectedFileNode?.fileSystemNode?.content
-  )
-
   const handleContentChange = useCallback(
     (content: string) => {
-      console.log(
-        "📝 Project page - Content changed:",
-        content.substring(0, 50) + "..."
-      )
       if (selectedFileNode?.fileSystemNode) {
-        console.log(
-          "📝 Project page - Updating file:",
-          selectedFileNode.fileSystemNode.id
-        )
         fileSystemNodeCollection.update(
           selectedFileNode.fileSystemNode.id.toString(),
           (draft) => {
@@ -42,11 +28,6 @@ function ProjectPage() {
   )
 
   const fileContent = selectedFileNode?.fileSystemNode?.content ?? undefined
-
-  console.log(
-    "📄 Project page - Final fileContent being passed to editor:",
-    fileContent
-  )
 
   return (
     <div className="h-full">

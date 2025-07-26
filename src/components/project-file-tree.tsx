@@ -55,8 +55,6 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
         ),
     [projectId]
   )
-  // console.log(JSON.stringify(fileSystemNodes))
-
   const { data: projects = [] } = useLiveQuery(
     (q) =>
       q
@@ -71,17 +69,10 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
   }, [fileSystemNodes])
 
   const handleNodeSelect = (item: TreeDataItem | undefined) => {
-    console.log("🌳 File tree - handleNodeSelect called with:", item)
     if (item && "fileSystemNode" in item) {
       const fileNode = item as FileTreeNode
-      console.log("🌳 File tree - Setting selected file node:", fileNode)
-      console.log(
-        "🌳 File tree - File content:",
-        fileNode.fileSystemNode?.content
-      )
       setSelectedFileNode(fileNode)
     } else {
-      console.log("🌳 File tree - Clearing selected file node")
       setSelectedFileNode(undefined)
     }
   }

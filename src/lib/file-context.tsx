@@ -13,8 +13,6 @@ export function FileProvider({ children }: { children: ReactNode }) {
     FileTreeNode | undefined
   >()
 
-  console.log("📁 Context - Current selected file node:", selectedFileNode)
-
   return (
     <FileContext.Provider value={{ selectedFileNode, setSelectedFileNode }}>
       {children}

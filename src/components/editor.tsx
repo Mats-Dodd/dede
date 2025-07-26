@@ -17,29 +17,19 @@ const Tiptap = ({ content, onContentChange }: TiptapProps) => {
     content !== null && content !== undefined && content !== ""
       ? content
       : "<p>Start typing to add content...</p>"
-  console.log("✏️  Editor - Received content prop:", content)
-  console.log("✏️  Editor - onContentChange prop:", !!onContentChange)
 
   const editor = useEditor({
     extensions,
     content: editorContent,
     onUpdate: ({ editor }) => {
       const html = editor.getHTML()
-      console.log(
-        "✏️  Editor - Content updated:",
-        html.substring(0, 50) + "..."
-      )
       onContentChange?.(html)
     },
   })
 
   // Update editor content when prop changes
   useEffect(() => {
-    console.log("✏️  Editor - useEffect triggered, content:", content)
-    console.log("✏️  Editor - editorContent:", editorContent)
-    console.log("✏️  Editor - Current editor content:", editor?.getHTML())
     if (editor && editorContent !== editor.getHTML()) {
-      console.log("✏️  Editor - Setting new content")
       editor.commands.setContent(editorContent)
     }
   }, [content, editorContent, editor])

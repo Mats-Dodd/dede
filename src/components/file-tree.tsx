@@ -138,7 +138,7 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
         <div
           className="w-full h-[48px]"
           onDrop={(_e) => {
-            handleDrop({ id: "", name: "parent_div" })
+            setDraggedItem(null)
           }}
         ></div>
       </div>

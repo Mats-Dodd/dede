@@ -300,7 +300,7 @@ const TreeNode = ({
             {item.actions}
           </TreeActions>
         </AccordionTrigger>
-        <AccordionContent className="ml-4 pl-1 border-l">
+        <AccordionContent className="ml-4 border-l">
           <TreeItem
             data={item.children ? item.children : item}
             selectedItemId={selectedItemId}

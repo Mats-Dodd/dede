@@ -4,13 +4,10 @@ import { Outlet } from "@tanstack/react-router"
 import { authClient } from "@/lib/auth-client"
 import { useLiveQuery } from "@tanstack/react-db"
 import { projectCollection } from "@/lib/collections"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/app-sidebar"
+import { SidebarInset, SidebarProvider } from "@/components/app-sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { FileProvider } from "@/lib/file-context"
+import Navbar from "@/components/navbar"
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -63,12 +60,7 @@ function AuthenticatedLayout() {
         <div className="min-h-screen flex w-full">
           <AppSidebar />
           <SidebarInset>
-            <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-              <SidebarTrigger />
-              <h1 className="text-xl font-semibold">
-                TanStack DB / Electric Starter
-              </h1>
-            </header>
+            <Navbar />
             <main className="flex-1 p-4">
               <Outlet />
             </main>

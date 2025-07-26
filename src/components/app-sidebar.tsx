@@ -3,17 +3,8 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
-import {
-  PanelLeftIcon,
-  PlusIcon,
-  FolderIcon,
-  UserIcon,
-  LogOutIcon,
-} from "lucide-react"
-import { Link, useLocation, useNavigate } from "@tanstack/react-router"
-import { useState } from "react"
-import { useLiveQuery } from "@tanstack/react-db"
-import { projectCollection } from "@/lib/collections"
+import { PanelLeftIcon, UserIcon, LogOutIcon, SettingsIcon } from "lucide-react"
+import { useLocation, useNavigate } from "@tanstack/react-router"
 import { authClient } from "@/lib/auth-client"
 
 import { cn } from "@/lib/utils"
@@ -729,8 +720,6 @@ export function AppSidebar() {
   const { data: session } = authClient.useSession()
   const navigate = useNavigate()
   const location = useLocation()
-  const [showNewProjectForm, setShowNewProjectForm] = useState(false)
-  const [newProjectName, setNewProjectName] = useState("")
 
   // Extract project ID from current route
   const currentProjectId = location.pathname.match(/\/project\/(\d+)/)?.[1]
@@ -738,26 +727,9 @@ export function AppSidebar() {
     ? parseInt(currentProjectId, 10)
     : null
 
-  const { data: projects } = useLiveQuery((q) => q.from({ projectCollection }))
-
   const handleLogout = async () => {
     await authClient.signOut()
     navigate({ to: "/login" })
-  }
-
-  const handleCreateProject = () => {
-    if (newProjectName.trim() && session) {
-      projectCollection.insert({
-        id: Math.floor(Math.random() * 100000),
-        name: newProjectName.trim(),
-        description: "",
-        ownerId: session.user.id,
-        sharedUserIds: [],
-        createdAt: new Date(),
-      })
-      setNewProjectName("")
-      setShowNewProjectForm(false)
-    }
   }
 
   return (
@@ -765,75 +737,12 @@ export function AppSidebar() {
       <SidebarHeader>
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-semibold group-data-[collapsible=icon]:hidden">
-            Arbor Editor
+            Files
           </h1>
         </div>
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel className="flex items-center justify-between">
-            <span className="group-data-[collapsible=icon]:hidden">
-              Projects
-            </span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <SidebarGroupAction
-                  onClick={() => setShowNewProjectForm(!showNewProjectForm)}
-                >
-                  <PlusIcon />
-                </SidebarGroupAction>
-              </TooltipTrigger>
-              <TooltipContent side="right">Add Project</TooltipContent>
-            </Tooltip>
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            {showNewProjectForm && (
-              <div className="p-2 border rounded-md mb-2 group-data-[collapsible=icon]:hidden">
-                <input
-                  type="text"
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleCreateProject()}
-                  placeholder="Project name"
-                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm mb-2"
-                />
-                <div className="flex gap-1">
-                  <Button onClick={handleCreateProject} size="sm">
-                    Create
-                  </Button>
-                  <Button
-                    onClick={() => setShowNewProjectForm(false)}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
-            <SidebarMenu>
-              {projects?.map((project) => (
-                <SidebarMenuItem key={project.id}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={selectedProjectId === project.id}
-                    tooltip={project.name}
-                  >
-                    <Link
-                      to="/project/$projectId"
-                      params={{ projectId: project.id.toString() }}
-                    >
-                      <FolderIcon />
-                      <span>{project.name}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
         {selectedProjectId && (
           <SidebarGroup>
             <SidebarGroupContent>
@@ -841,10 +750,25 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+        {!selectedProjectId && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <div className="p-4 text-sm text-muted-foreground group-data-[collapsible=icon]:hidden">
+                Select a project from the navbar to view files
+              </div>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter>
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton tooltip="Settings">
+              <SettingsIcon />
+              <span>Settings</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton tooltip={session?.user.email}>
               <UserIcon />

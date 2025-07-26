@@ -27,6 +27,7 @@ interface TreeDataItem {
   children?: TreeDataItem[]
   actions?: React.ReactNode
   onClick?: () => void
+  onContextMenu?: (e: React.MouseEvent) => void
   draggable?: boolean
   droppable?: boolean
   disabled?: boolean
@@ -279,9 +280,18 @@ const TreeNode = ({
             selectedItemId === item.id && selectedTreeVariants(),
             isDragOver && dragOverVariants()
           )}
-          onClick={() => {
-            handleSelectChange(item)
-            item.onClick?.()
+          onClick={(e) => {
+            if (e.ctrlKey || e.metaKey) {
+              e.preventDefault()
+              item.onContextMenu?.(e)
+            } else {
+              handleSelectChange(item)
+              item.onClick?.()
+            }
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            item.onContextMenu?.(e)
           }}
           draggable={!!item.draggable}
           onDragStart={onDragStart}
@@ -389,10 +399,20 @@ const TreeLeaf = React.forwardRef<
           isDragOver && dragOverVariants(),
           item.disabled && "opacity-50 cursor-not-allowed pointer-events-none"
         )}
-        onClick={() => {
+        onClick={(e) => {
           if (item.disabled) return
-          handleSelectChange(item)
-          item.onClick?.()
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            item.onContextMenu?.(e)
+          } else {
+            handleSelectChange(item)
+            item.onClick?.()
+          }
+        }}
+        onContextMenu={(e) => {
+          if (item.disabled) return
+          e.preventDefault()
+          item.onContextMenu?.(e)
         }}
         draggable={!!item.draggable && !item.disabled}
         onDragStart={onDragStart}

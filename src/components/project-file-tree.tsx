@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { useLiveQuery, eq } from "@tanstack/react-db"
 import { TreeView, type TreeDataItem } from "@/components/file-tree"
 import { fileSystemNodeCollection, projectCollection } from "@/lib/collections"
@@ -9,6 +9,7 @@ import {
   createNewFileSystemNode,
   type FileTreeNode,
 } from "@/lib/file-tree-utils"
+import { useFileContext } from "@/lib/file-context"
 import { type FileSystemNode } from "@/db/schema"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,15 +30,10 @@ import { FolderPlusIcon, FilePlusIcon, TrashIcon, EditIcon } from "lucide-react"
 
 interface ProjectFileTreeProps {
   projectId: number
-  selectedNodeId?: string
-  onNodeSelect?: (node: FileTreeNode | undefined) => void
 }
 
-export function ProjectFileTree({
-  projectId,
-  selectedNodeId,
-  onNodeSelect,
-}: ProjectFileTreeProps) {
+export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
+  const { selectedFileNode, setSelectedFileNode } = useFileContext()
   const [newItemDialog, setNewItemDialog] = useState<{
     open: boolean
     type: "file" | "directory"
@@ -59,8 +55,6 @@ export function ProjectFileTree({
         ),
     [projectId]
   )
-  console.log(JSON.stringify(fileSystemNodes))
-
   const { data: projects = [] } = useLiveQuery(
     (q) =>
       q
@@ -76,9 +70,10 @@ export function ProjectFileTree({
 
   const handleNodeSelect = (item: TreeDataItem | undefined) => {
     if (item && "fileSystemNode" in item) {
-      onNodeSelect?.(item as FileTreeNode)
+      const fileNode = item as FileTreeNode
+      setSelectedFileNode(fileNode)
     } else {
-      onNodeSelect?.(undefined)
+      setSelectedFileNode(undefined)
     }
   }
 
@@ -209,9 +204,9 @@ export function ProjectFileTree({
         actions: (
           <ContextMenu>
             <ContextMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+              <span className="inline-flex items-center justify-center h-6 w-6 text-xs cursor-pointer hover:bg-gray-100 rounded">
                 •••
-              </Button>
+              </span>
             </ContextMenuTrigger>
             <ContextMenuContent>
               {renderContextMenuActions(node)}
@@ -268,7 +263,7 @@ export function ProjectFileTree({
         {treeDataWithActions.length > 0 ? (
           <TreeView
             data={treeDataWithActions}
-            initialSelectedItemId={selectedNodeId}
+            initialSelectedItemId={selectedFileNode?.id}
             onSelectChange={handleNodeSelect}
             onDocumentDrag={handleDocumentDrag}
             className="min-h-[200px]"

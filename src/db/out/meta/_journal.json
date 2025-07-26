@@ -29,6 +29,13 @@
       "when": 1753389864227,
       "tag": "0003_wooden_random",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1753571148980,
+      "tag": "0004_outgoing_barracuda",
+      "breakpoints": true
     }
   ]
 }

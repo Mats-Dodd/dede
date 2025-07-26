@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { useLiveQuery, eq } from "@tanstack/react-db"
 import { TreeView, type TreeDataItem } from "@/components/file-tree"
 import { fileSystemNodeCollection, projectCollection } from "@/lib/collections"

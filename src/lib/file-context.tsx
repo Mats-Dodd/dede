@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from "react"
+import { createContext, useContext, useState, type ReactNode } from "react"
 import { type FileTreeNode } from "@/lib/file-tree-utils"
 
 interface FileContextType {

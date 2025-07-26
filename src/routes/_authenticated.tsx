@@ -1,10 +1,32 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router"
+import {
+  createFileRoute,
+  useNavigate,
+  Link,
+  useLocation,
+} from "@tanstack/react-router"
 import { useEffect, useState } from "react"
 import { Outlet } from "@tanstack/react-router"
 import { authClient } from "@/lib/auth-client"
 import { useLiveQuery } from "@tanstack/react-db"
 import { projectCollection } from "@/lib/collections"
 import { Button } from "@/components/ui/button"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar"
+import { ProjectFileTree } from "@/components/project-file-tree"
+import { PlusIcon } from "lucide-react"
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -14,8 +36,15 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthenticatedLayout() {
   const { data: session, isPending } = authClient.useSession()
   const navigate = useNavigate()
+  const location = useLocation()
   const [showNewProjectForm, setShowNewProjectForm] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
+
+  // Extract project ID from current route
+  const currentProjectId = location.pathname.match(/\/project\/(\d+)/)?.[1]
+  const selectedProjectId = currentProjectId
+    ? parseInt(currentProjectId, 10)
+    : null
 
   const { data: projects, isLoading } = useLiveQuery((q) =>
     q.from({ projectCollection })
@@ -74,93 +103,114 @@ function AuthenticatedLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex-shrink-0">
-              <h1 className="text-xl font-semibold text-gray-900">
-                TanStack DB / Electric Starter
-              </h1>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <Sidebar>
+          <SidebarHeader>
+            <div className="flex items-center justify-between">
+              <h1 className="text-lg font-semibold">Arbor Editor</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-700">
-                {session.user.email}
-              </span>
-              <Button onClick={handleLogout} variant="ghost">
-                Sign out
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-      <div className="flex">
-        <aside className="w-64 bg-white shadow-sm border-r border-gray-200 min-h-screen">
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-medium text-gray-900">Projects</h2>
-              <Button
-                onClick={() => setShowNewProjectForm(!showNewProjectForm)}
-                variant="ghost"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                  />
-                </svg>
-              </Button>
-            </div>
+          </SidebarHeader>
 
-            {showNewProjectForm && (
-              <div className="mb-4 p-3 bg-gray-50 rounded-md">
-                <input
-                  type="text"
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleCreateProject()}
-                  placeholder="Project name"
-                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                />
-                <div className="flex gap-2 mt-2">
-                  <Button onClick={handleCreateProject} variant="default">
-                    Create
-                  </Button>
-                  <Button
-                    onClick={() => setShowNewProjectForm(false)}
-                    variant="outline"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarGroupLabel className="flex items-center justify-between">
+                Projects
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowNewProjectForm(!showNewProjectForm)}
+                  className="h-6 w-6 p-0"
+                >
+                  <PlusIcon className="h-3 w-3" />
+                </Button>
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                {showNewProjectForm && (
+                  <div className="p-2 border rounded-md mb-2">
+                    <input
+                      type="text"
+                      value={newProjectName}
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && handleCreateProject()
+                      }
+                      placeholder="Project name"
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm mb-2"
+                    />
+                    <div className="flex gap-1">
+                      <Button onClick={handleCreateProject} size="sm">
+                        Create
+                      </Button>
+                      <Button
+                        onClick={() => setShowNewProjectForm(false)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                <SidebarMenu>
+                  {projects?.map((project) => (
+                    <SidebarMenuItem key={project.id}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={selectedProjectId === project.id}
+                      >
+                        <Link
+                          to="/project/$projectId"
+                          params={{ projectId: project.id.toString() }}
+                        >
+                          {project.name}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {selectedProjectId && (
+              <SidebarGroup>
+                <SidebarGroupContent>
+                  <ProjectFileTree projectId={selectedProjectId} />
+                </SidebarGroupContent>
+              </SidebarGroup>
             )}
+          </SidebarContent>
 
-            <nav className="space-y-1">
-              {projects.map((project) => (
-                <Link
-                  key={project.id}
-                  to="/project/$projectId"
-                  params={{ projectId: project.id.toString() }}
-                  className="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md hover:text-gray-900"
-                >
-                  {project.name}
-                </Link>
-              ))}
-            </nav>
-          </div>
-        </aside>
-        <main className="flex-1 p-4">
-          <Outlet />
-        </main>
+          <SidebarFooter>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton>
+                  <span className="text-sm text-muted-foreground">
+                    {session.user.email}
+                  </span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={handleLogout}>
+                  Sign out
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarFooter>
+        </Sidebar>
+
+        <SidebarInset>
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+            <SidebarTrigger />
+            <h1 className="text-xl font-semibold">
+              TanStack DB / Electric Starter
+            </h1>
+          </header>
+          <main className="flex-1 p-4">
+            <Outlet />
+          </main>
+        </SidebarInset>
       </div>
-    </div>
+    </SidebarProvider>
   )
 }

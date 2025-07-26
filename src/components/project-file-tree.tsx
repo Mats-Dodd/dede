@@ -14,12 +14,6 @@ import { type FileSystemNode } from "@/db/schema"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -45,6 +39,12 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     node: FileSystemNode | null
   }>({ open: false, node: null })
   const [editForm, setEditForm] = useState({ name: "", content: "" })
+  const [contextMenu, setContextMenu] = useState<{
+    open: boolean
+    x: number
+    y: number
+    node: FileTreeNode | null
+  }>({ open: false, x: 0, y: 0, node: null })
 
   const { data: fileSystemNodes = [] } = useLiveQuery(
     (q) =>
@@ -132,11 +132,13 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     if (!editDialog.node || !editForm.name.trim()) return
 
     const node = editDialog.node
+    const oldPath = node.path
     const newPath = node.path.replace(
       new RegExp(`/${node.name}$`),
       `/${editForm.name.trim()}`
     )
 
+    // Update the current node
     fileSystemNodeCollection.update(node.id.toString(), (draft) => {
       draft.name = editForm.name.trim()
       draft.path = newPath
@@ -144,81 +146,60 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
       draft.updatedAt = new Date()
     })
 
+    // If this is a directory, update all child nodes' paths
+    if (node.type === "directory") {
+      const childNodes = fileSystemNodes.filter((child) =>
+        child.path.startsWith(oldPath + "/")
+      )
+
+      childNodes.forEach((child) => {
+        const updatedChildPath = child.path.replace(oldPath, newPath)
+        fileSystemNodeCollection.update(child.id.toString(), (draft) => {
+          draft.path = updatedChildPath
+          draft.updatedAt = new Date()
+        })
+      })
+    }
+
     setEditDialog({ open: false, node: null })
     setEditForm({ name: "", content: "" })
   }
 
   const handleDelete = (node: FileSystemNode) => {
+    // If this is a directory, delete all child nodes first
+    if (node.type === "directory") {
+      const childNodes = fileSystemNodes.filter((child) =>
+        child.path.startsWith(node.path + "/")
+      )
+
+      childNodes.forEach((child) => {
+        fileSystemNodeCollection.delete(child.id.toString())
+      })
+    }
+
+    // Delete the node itself
     fileSystemNodeCollection.delete(node.id.toString())
   }
 
-  const renderContextMenuActions = (node: FileTreeNode) => (
-    <>
-      <ContextMenuItem
-        onClick={() =>
-          setNewItemDialog({
-            open: true,
-            type: "file",
-            parentPath: node.type === "directory" ? node.path : "/",
-          })
-        }
-        className="flex items-center gap-2"
-      >
-        <FilePlusIcon className="h-4 w-4" />
-        New File
-      </ContextMenuItem>
-      <ContextMenuItem
-        onClick={() =>
-          setNewItemDialog({
-            open: true,
-            type: "directory",
-            parentPath: node.type === "directory" ? node.path : "/",
-          })
-        }
-        className="flex items-center gap-2"
-      >
-        <FolderPlusIcon className="h-4 w-4" />
-        New Folder
-      </ContextMenuItem>
-      <ContextMenuItem
-        onClick={() => handleEdit(node.fileSystemNode)}
-        className="flex items-center gap-2"
-      >
-        <EditIcon className="h-4 w-4" />
-        Rename
-      </ContextMenuItem>
-      <ContextMenuItem
-        onClick={() => handleDelete(node.fileSystemNode)}
-        className="flex items-center gap-2 text-destructive"
-      >
-        <TrashIcon className="h-4 w-4" />
-        Delete
-      </ContextMenuItem>
-    </>
-  )
-
-  const treeDataWithActions: TreeDataItem[] = useMemo(() => {
-    const addActions = (nodes: FileTreeNode[]): TreeDataItem[] => {
+  const treeDataWithContextMenu: TreeDataItem[] = useMemo(() => {
+    const addContextMenu = (nodes: FileTreeNode[]): TreeDataItem[] => {
       return nodes.map((node) => ({
         ...node,
-        actions: (
-          <ContextMenu>
-            <ContextMenuTrigger asChild>
-              <span className="inline-flex items-center justify-center h-6 w-6 text-xs cursor-pointer hover:bg-gray-100 rounded">
-                •••
-              </span>
-            </ContextMenuTrigger>
-            <ContextMenuContent>
-              {renderContextMenuActions(node)}
-            </ContextMenuContent>
-          </ContextMenu>
-        ),
+        onContextMenu: (e: React.MouseEvent) => {
+          e.preventDefault()
+          setContextMenu({
+            open: true,
+            x: e.clientX,
+            y: e.clientY,
+            node: node,
+          })
+        },
         children: node.children
-          ? addActions(node.children as FileTreeNode[])
+          ? addContextMenu(node.children as FileTreeNode[])
           : undefined,
       }))
     }
-    return addActions(treeData)
+    return addContextMenu(treeData)
   }, [treeData])
 
   if (!project) {
@@ -260,9 +241,9 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
           </div>
         </div>
 
-        {treeDataWithActions.length > 0 ? (
+        {treeDataWithContextMenu.length > 0 ? (
           <TreeView
-            data={treeDataWithActions}
+            data={treeDataWithContextMenu}
             initialSelectedItemId={selectedFileNode?.id}
             onSelectChange={handleNodeSelect}
             onDocumentDrag={handleDocumentDrag}
@@ -361,6 +342,98 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Context Menu */}
+      {contextMenu.open && contextMenu.node && (
+        <div
+          className="fixed z-50"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <div
+            className="fixed inset-0"
+            onClick={() =>
+              setContextMenu({ open: false, x: 0, y: 0, node: null })
+            }
+          />
+          <div className="bg-white border border-gray-200 rounded-md shadow-lg p-1 min-w-[160px] relative z-10">
+            {contextMenu.node.type === "directory" ? (
+              <div className="space-y-1">
+                <button
+                  onClick={() => {
+                    setNewItemDialog({
+                      open: true,
+                      type: "file",
+                      parentPath: contextMenu.node!.path,
+                    })
+                    setContextMenu({ open: false, x: 0, y: 0, node: null })
+                  }}
+                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm hover:bg-gray-100 rounded"
+                >
+                  <FilePlusIcon className="h-4 w-4" />
+                  New File
+                </button>
+                <button
+                  onClick={() => {
+                    setNewItemDialog({
+                      open: true,
+                      type: "directory",
+                      parentPath: contextMenu.node!.path,
+                    })
+                    setContextMenu({ open: false, x: 0, y: 0, node: null })
+                  }}
+                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm hover:bg-gray-100 rounded"
+                >
+                  <FolderPlusIcon className="h-4 w-4" />
+                  New Folder
+                </button>
+                <button
+                  onClick={() => {
+                    handleEdit(contextMenu.node!.fileSystemNode)
+                    setContextMenu({ open: false, x: 0, y: 0, node: null })
+                  }}
+                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm hover:bg-gray-100 rounded"
+                >
+                  <EditIcon className="h-4 w-4" />
+                  Rename
+                </button>
+                <button
+                  onClick={() => {
+                    handleDelete(contextMenu.node!.fileSystemNode)
+                    setContextMenu({ open: false, x: 0, y: 0, node: null })
+                  }}
+                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  Delete
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <button
+                  onClick={() => {
+                    handleEdit(contextMenu.node!.fileSystemNode)
+                    setContextMenu({ open: false, x: 0, y: 0, node: null })
+                  }}
+                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm hover:bg-gray-100 rounded"
+                >
+                  <EditIcon className="h-4 w-4" />
+                  Rename
+                </button>
+                <button
+                  onClick={() => {
+                    handleDelete(contextMenu.node!.fileSystemNode)
+                    setContextMenu({ open: false, x: 0, y: 0, node: null })
+                  }}
+                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   )
 }

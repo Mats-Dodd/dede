@@ -1,3 +1,4 @@
+import React from "react"
 import { ChevronsUpDown, PanelLeftIcon } from "lucide-react"
 import { Select as SelectPrimitive } from "radix-ui"
 import { useLocation, useNavigate } from "@tanstack/react-router"
@@ -99,18 +100,28 @@ export default function Navbar() {
                       </SelectContent>
                     </Select>
                   </BreadcrumbItem>
-                  {selectedFileNode && (
-                    <>
-                      <BreadcrumbSeparator> / </BreadcrumbSeparator>
-                      <BreadcrumbItem>
-                        <BreadcrumbPage>
-                          {selectedFileNode.path.startsWith("/")
-                            ? selectedFileNode.path.slice(1)
-                            : selectedFileNode.path}
-                        </BreadcrumbPage>
-                      </BreadcrumbItem>
-                    </>
-                  )}
+                  {selectedFileNode &&
+                    (() => {
+                      const cleanPath = selectedFileNode.path.startsWith("/")
+                        ? selectedFileNode.path.slice(1)
+                        : selectedFileNode.path
+                      const pathSegments = cleanPath.split("/").filter(Boolean)
+
+                      return pathSegments.map((segment, index) => (
+                        <React.Fragment key={index}>
+                          <BreadcrumbSeparator> / </BreadcrumbSeparator>
+                          <BreadcrumbItem>
+                            {index === pathSegments.length - 1 ? (
+                              <BreadcrumbPage>{segment}</BreadcrumbPage>
+                            ) : (
+                              <span className="text-muted-foreground">
+                                {segment}
+                              </span>
+                            )}
+                          </BreadcrumbItem>
+                        </React.Fragment>
+                      ))
+                    })()}
                 </>
               )}
             </BreadcrumbList>

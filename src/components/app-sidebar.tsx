@@ -736,9 +736,14 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold group-data-[collapsible=icon]:hidden">
-            Files
-          </h1>
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-sm">
+              G
+            </div>
+            <h1 className="text-lg font-semibold group-data-[collapsible=icon]:hidden">
+              Gutenberg
+            </h1>
+          </div>
         </div>
       </SidebarHeader>
 
@@ -746,7 +751,9 @@ export function AppSidebar() {
         {selectedProjectId && (
           <SidebarGroup>
             <SidebarGroupContent>
-              <ProjectFileTree projectId={selectedProjectId} />
+              <div className="group-data-[collapsible=icon]:hidden">
+                <ProjectFileTree projectId={selectedProjectId} />
+              </div>
             </SidebarGroupContent>
           </SidebarGroup>
         )}

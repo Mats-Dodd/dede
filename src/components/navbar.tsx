@@ -4,11 +4,13 @@ import { useLocation, useNavigate } from "@tanstack/react-router"
 import { useLiveQuery } from "@tanstack/react-db"
 import { projectCollection } from "@/lib/collections"
 import { useSidebar } from "@/components/app-sidebar"
+import { useFileContext } from "@/lib/file-context"
 
 import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbList,
+  BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
@@ -21,6 +23,7 @@ import {
 
 export default function Navbar() {
   const { toggleSidebar } = useSidebar()
+  const { selectedFileNode } = useFileContext()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -58,12 +61,10 @@ export default function Navbar() {
           {/* Breadcrumb with project selection */}
           <Breadcrumb>
             <BreadcrumbList>
-              <BreadcrumbItem>
-                <span className="text-sm font-medium">Arbor Editor</span>
-              </BreadcrumbItem>
+              <BreadcrumbItem></BreadcrumbItem>
               {projects && projects.length > 0 && (
                 <>
-                  <BreadcrumbSeparator> / </BreadcrumbSeparator>
+                  {/* <BreadcrumbSeparator> / </BreadcrumbSeparator> */}
                   <BreadcrumbItem>
                     <Select
                       value={currentProjectId || ""}
@@ -75,14 +76,14 @@ export default function Navbar() {
                       >
                         <Button
                           variant="ghost"
-                          className="focus-visible:bg-accent text-foreground h-8 p-1.5 focus-visible:ring-0"
+                          className="focus-visible:bg-accent text-foreground h-8 px-2 focus-visible:ring-0"
                         >
                           <SelectValue placeholder="Select project">
                             {selectedProject?.name || "Select project"}
                           </SelectValue>
                           <ChevronsUpDown
                             size={14}
-                            className="text-muted-foreground/80"
+                            className="text-muted-foreground/80 ml-1"
                           />
                         </Button>
                       </SelectPrimitive.SelectTrigger>
@@ -98,6 +99,18 @@ export default function Navbar() {
                       </SelectContent>
                     </Select>
                   </BreadcrumbItem>
+                  {selectedFileNode && (
+                    <>
+                      <BreadcrumbSeparator> / </BreadcrumbSeparator>
+                      <BreadcrumbItem>
+                        <BreadcrumbPage>
+                          {selectedFileNode.path.startsWith("/")
+                            ? selectedFileNode.path.slice(1)
+                            : selectedFileNode.path}
+                        </BreadcrumbPage>
+                      </BreadcrumbItem>
+                    </>
+                  )}
                 </>
               )}
             </BreadcrumbList>

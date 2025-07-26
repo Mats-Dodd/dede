@@ -3,7 +3,13 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
-import { PanelLeftIcon, PlusIcon } from "lucide-react"
+import {
+  PanelLeftIcon,
+  PlusIcon,
+  FolderIcon,
+  UserIcon,
+  LogOutIcon,
+} from "lucide-react"
 import { Link, useLocation, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { useLiveQuery } from "@tanstack/react-db"
@@ -818,6 +824,7 @@ export function AppSidebar() {
                       to="/project/$projectId"
                       params={{ projectId: project.id.toString() }}
                     >
+                      <FolderIcon />
                       <span>{project.name}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -840,6 +847,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton tooltip={session?.user.email}>
+              <UserIcon />
               <span className="text-sm text-muted-foreground truncate">
                 {session?.user.email}
               </span>
@@ -847,6 +855,7 @@ export function AppSidebar() {
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton onClick={handleLogout} tooltip="Sign out">
+              <LogOutIcon />
               <span>Sign out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>

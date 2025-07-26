@@ -113,6 +113,7 @@ export function createNewFileSystemNode(
     path,
     name,
     type,
+    title: null, // Default to null for new files, can be set later in the editor
     content: content || null,
     metadata: {},
     isDeleted: false,

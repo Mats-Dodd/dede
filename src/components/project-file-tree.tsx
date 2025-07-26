@@ -132,11 +132,13 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     if (!editDialog.node || !editForm.name.trim()) return
 
     const node = editDialog.node
+    const oldPath = node.path
     const newPath = node.path.replace(
       new RegExp(`/${node.name}$`),
       `/${editForm.name.trim()}`
     )
 
+    // Update the current node
     fileSystemNodeCollection.update(node.id.toString(), (draft) => {
       draft.name = editForm.name.trim()
       draft.path = newPath
@@ -144,11 +146,38 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
       draft.updatedAt = new Date()
     })
 
+    // If this is a directory, update all child nodes' paths
+    if (node.type === "directory") {
+      const childNodes = fileSystemNodes.filter((child) =>
+        child.path.startsWith(oldPath + "/")
+      )
+
+      childNodes.forEach((child) => {
+        const updatedChildPath = child.path.replace(oldPath, newPath)
+        fileSystemNodeCollection.update(child.id.toString(), (draft) => {
+          draft.path = updatedChildPath
+          draft.updatedAt = new Date()
+        })
+      })
+    }
+
     setEditDialog({ open: false, node: null })
     setEditForm({ name: "", content: "" })
   }
 
   const handleDelete = (node: FileSystemNode) => {
+    // If this is a directory, delete all child nodes first
+    if (node.type === "directory") {
+      const childNodes = fileSystemNodes.filter((child) =>
+        child.path.startsWith(node.path + "/")
+      )
+
+      childNodes.forEach((child) => {
+        fileSystemNodeCollection.delete(child.id.toString())
+      })
+    }
+
+    // Delete the node itself
     fileSystemNodeCollection.delete(node.id.toString())
   }
 

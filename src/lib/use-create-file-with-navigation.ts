@@ -98,6 +98,12 @@ export function useCreateFileWithNavigation(): CreateFileResult {
             icon: undefined, // Will be set by the tree component
           }
 
+          console.log(
+            "📁 use-create-file-with-navigation calling setSelectedFileNode for:",
+            fileTreeNode.fileSystemNode.id.toString(),
+            "title:",
+            fileTreeNode.fileSystemNode.title
+          )
           setSelectedFileNode(fileTreeNode)
 
           // Navigate to the project page if not already there

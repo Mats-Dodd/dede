@@ -6,9 +6,8 @@ import { useParams } from "@tanstack/react-router"
 
 export interface CommandPaletteFile {
   id: string
-  name: string
+  title: string
   path: string
-  title?: string | null
   type: string
   isRecent?: boolean
 }
@@ -54,9 +53,8 @@ export function useCommandPalette() {
   const files = useMemo((): CommandPaletteFile[] => {
     return allFiles.map((file) => ({
       id: file.id.toString(),
-      name: file.name,
-      path: file.path,
       title: file.title,
+      path: file.path,
       type: file.type,
       isRecent: recentFileIds.includes(file.id.toString()),
     }))
@@ -75,18 +73,16 @@ export function useCommandPalette() {
     const query = searchQuery.toLowerCase()
     return files
       .map((file) => {
-        const titleMatch = file.title?.toLowerCase().includes(query) ?? false
-        const nameMatch = file.name.toLowerCase().includes(query)
+        const titleMatch = file.title.toLowerCase().includes(query)
         const pathMatch = file.path.toLowerCase().includes(query)
 
         // Calculate relevance score
         let score = 0
         if (titleMatch) score += 3
-        if (nameMatch) score += 2
         if (pathMatch) score += 1
         if (file.isRecent) score += 1
 
-        return { file, score, matches: titleMatch || nameMatch || pathMatch }
+        return { file, score, matches: titleMatch || pathMatch }
       })
       .filter(({ matches }) => matches)
       .sort((a, b) => b.score - a.score)
@@ -110,7 +106,7 @@ export function useCommandPalette() {
         // Create a FileTreeNode structure that openFile expects
         const fileTreeNode = {
           id: fileSystemNode.id.toString(),
-          name: fileSystemNode.name,
+          name: fileSystemNode.title,
           path: fileSystemNode.path,
           type: fileSystemNode.type as "file" | "directory",
           fileSystemNode: fileSystemNode,

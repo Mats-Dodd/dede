@@ -89,8 +89,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   }
 
   const renderFileItem = (file: CommandPaletteFile) => {
-    const IconComponent = getFileIcon(file.name, file.type)
-    const displayName = file.title || file.name
+    const IconComponent = getFileIcon(file.title, file.type)
+    const displayName = file.title
     const displayPath = file.path.split("/").slice(0, -1).join("/")
 
     return (

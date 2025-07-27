@@ -153,7 +153,6 @@ export const fileSystemNodeCollection = createCollection(
       // @ts-expect-error - API types not properly generated yet
       const result = await client.api.fileSystemNodes.$post({
         json: {
-          name: newFileSystemNode.name,
           path: newFileSystemNode.path,
           content: newFileSystemNode.content,
           title: newFileSystemNode.title,
@@ -177,7 +176,6 @@ export const fileSystemNodeCollection = createCollection(
       const result = await client.api.fileSystemNodes[":id"].$put({
         param: { id: updatedFileSystemNode.id },
         json: {
-          name: updatedFileSystemNode.name,
           content: updatedFileSystemNode.content,
           title: updatedFileSystemNode.title,
           path: updatedFileSystemNode.path,

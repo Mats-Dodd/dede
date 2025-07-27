@@ -20,12 +20,12 @@ export function transformFileSystemNodesToTree(
       if (a.type !== b.type) {
         return a.type === "directory" ? -1 : 1
       }
-      return a.name.localeCompare(b.name)
+      return a.title.localeCompare(b.title)
     })
     .forEach((node) => {
       const treeNode: FileTreeNode = {
         id: node.id.toString(),
-        name: node.name,
+        name: node.title,
         path: node.path,
         type: node.type as "file" | "directory",
         fileSystemNode: node,
@@ -111,9 +111,8 @@ export function createNewFileSystemNode(
   return {
     projectId,
     path,
-    name,
+    title: name, // Use the provided name as the title
     type,
-    title: null, // Default to null for new files, can be set later in the editor
     content: content || null,
     metadata: {},
     isDeleted: false,

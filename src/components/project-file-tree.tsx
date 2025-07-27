@@ -63,11 +63,11 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     return rawFileSystemNodes.filter((node) => {
       // Filter out phantom records that have invalid name/path combinations
       const isPhantomRecord =
-        (node.name === "name" && node.path === "file") ||
+        (node.title === "name" && node.path === "file") ||
         // Also filter out any records with empty/invalid names or paths
-        !node.name ||
+        !node.title ||
         !node.path ||
-        node.name.trim() === "" ||
+        node.title.trim() === "" ||
         node.path.trim() === ""
 
       return !isPhantomRecord
@@ -111,7 +111,9 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     if (target.type !== "directory") return
 
     const newPath =
-      target.path === "/" ? `/${source.name}` : `${target.path}/${source.name}`
+      target.path === "/"
+        ? `/${source.title}`
+        : `${target.path}/${source.title}`
 
     fileSystemNodeCollection.update(source.id, (draft) => {
       draft.path = newPath
@@ -142,7 +144,7 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
   const handleEdit = (node: FileSystemNode) => {
     setEditDialog({ open: true, node })
     setEditForm({
-      name: node.name,
+      name: node.title,
       content: node.content || "",
     })
   }
@@ -151,17 +153,17 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     if (!editDialog.node || !editForm.name.trim()) return
 
     const node = editDialog.node
-    const oldName = node.name
+    const oldName = node.title
     const newName = editForm.name.trim()
     const oldPath = node.path
     const newPath = node.path.replace(
-      new RegExp(`/${node.name}$`),
+      new RegExp(`/${node.title}$`),
       `/${newName}`
     )
 
     // Update the current node
     fileSystemNodeCollection.update(node.id.toString(), (draft) => {
-      draft.name = newName
+      draft.title = newName
       draft.path = newPath
       draft.content = editForm.content.trim() || null
       draft.updatedAt = new Date()
@@ -209,7 +211,7 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     // Delete the node itself
     fileSystemNodeCollection.delete(node.id.toString())
 
-    toast.success(`🗑️ ${itemType} '${node.name}' deleted`)
+    toast.success(`🗑️ ${itemType} '${node.title}' deleted`)
   }
 
   const treeDataWithContextMenu: TreeDataItem[] = useMemo(() => {

@@ -9,9 +9,12 @@ import {
   createMacShortcut,
 } from "@/lib/hooks/use-mac-keyboard-shortcuts"
 import { useTabNavigation } from "@/lib/hooks/use-tab-navigation"
+import { CommandPalette } from "@/components/command-palette"
+import { useCommandPalette } from "@/lib/hooks/use-command-palette"
 
 export default function TabManager() {
   const { openFiles, activeFileId, setActiveFile, closeFile } = useFileContext()
+  const { isOpen, openPalette, closePalette } = useCommandPalette()
 
   // Tab navigation actions
   const { goToNextTab, goToPreviousTab, goToTabByIndex, goToLastTab } =
@@ -19,6 +22,11 @@ export default function TabManager() {
 
   // Mac-optimized keyboard shortcuts
   useMacKeyboardShortcuts([
+    // Command palette shortcut (Cmd+P)
+    {
+      ...createMacShortcut("p"),
+      handler: openPalette,
+    },
     // Primary tab navigation with Cmd+Shift+Arrow keys
     {
       ...createMacShortcut("ArrowRight", { shiftKey: true }),
@@ -89,6 +97,7 @@ export default function TabManager() {
 
   return (
     <div className="h-full flex flex-col">
+      <CommandPalette isOpen={isOpen} onClose={closePalette} />
       <Tabs
         value={activeFileId}
         onValueChange={setActiveFile}

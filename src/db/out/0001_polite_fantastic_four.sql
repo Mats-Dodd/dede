@@ -1,4 +1,4 @@
-CREATE TABLE "file_system_nodes" (
+CREATE TABLE IF NOT EXISTS "file_system_nodes" (
 	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "file_system_nodes_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"project_id" integer NOT NULL,
 	"path" varchar(1000) NOT NULL,

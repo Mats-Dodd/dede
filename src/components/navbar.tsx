@@ -101,6 +101,7 @@ export default function Navbar() {
                     </Select>
                   </BreadcrumbItem>
                   {selectedFileNode &&
+                    selectedFileNode.fileSystemNode.type === "file" &&
                     (() => {
                       const cleanPath = selectedFileNode.path.startsWith("/")
                         ? selectedFileNode.path.slice(1)

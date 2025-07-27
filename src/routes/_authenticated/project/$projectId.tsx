@@ -42,8 +42,17 @@ function ProjectPage() {
     [selectedFileNode]
   )
 
-  const fileContent = selectedFileNode?.fileSystemNode?.content ?? undefined
-  const fileTitle = selectedFileNode?.fileSystemNode?.title ?? undefined
+  // Only render editor if we have a selected file (not directory)
+  if (!selectedFileNode || selectedFileNode.fileSystemNode.type !== "file") {
+    return (
+      <div className="h-full flex items-center justify-center text-muted-foreground">
+        Select a file to start editing
+      </div>
+    )
+  }
+
+  const fileContent = selectedFileNode.fileSystemNode.content ?? undefined
+  const fileTitle = selectedFileNode.fileSystemNode.title ?? undefined
 
   return (
     <div className="h-full">

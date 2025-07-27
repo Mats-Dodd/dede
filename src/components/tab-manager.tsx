@@ -8,14 +8,6 @@ import { X } from "lucide-react"
 export default function TabManager() {
   const { openFiles, activeFileId, setActiveFile, closeFile } = useFileContext()
 
-  console.log(
-    "🎯 TabManager render - openFiles:",
-    openFiles.map((f) => ({
-      id: f.fileSystemNode.id.toString(),
-      title: f.fileSystemNode.title,
-    }))
-  )
-
   // Deduplicate openFiles to prevent duplicate key errors
   const deduplicatedOpenFiles = openFiles.filter(
     (file, index, arr) =>
@@ -24,19 +16,6 @@ export default function TabManager() {
           f.fileSystemNode.id.toString() === file.fileSystemNode.id.toString()
       ) === index
   )
-
-  if (deduplicatedOpenFiles.length !== openFiles.length) {
-    console.log(
-      "🔴 Found duplicates! Original length:",
-      openFiles.length,
-      "Deduplicated length:",
-      deduplicatedOpenFiles.length
-    )
-    console.log(
-      "🔴 Duplicates found:",
-      openFiles.map((f) => f.fileSystemNode.id.toString())
-    )
-  }
 
   const handleContentChange = useCallback((content: string, fileId: string) => {
     fileSystemNodeCollection.update(fileId, (draft) => {

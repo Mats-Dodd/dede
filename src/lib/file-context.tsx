@@ -24,25 +24,10 @@ export function FileProvider({ children }: { children: ReactNode }) {
     if (node.fileSystemNode.type !== "file") return
 
     const nodeId = node.fileSystemNode.id.toString()
-    console.log(
-      "🔵 openFile called for:",
-      nodeId,
-      "title:",
-      node.fileSystemNode.title
-    )
 
     setOpenFiles((prev) => {
-      console.log(
-        "🔵 Current openFiles before update:",
-        prev.map((f) => ({
-          id: f.fileSystemNode.id.toString(),
-          title: f.fileSystemNode.title,
-        }))
-      )
-
       // Don't add if already open
       if (prev.some((f) => f.fileSystemNode.id.toString() === nodeId)) {
-        console.log("🟡 File already open, just switching to it:", nodeId)
         setActiveFileId(nodeId)
         setSelectedFileNode(node)
         return prev
@@ -50,13 +35,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
 
       // Add to open files and make it active
       const newFiles = [...prev, node]
-      console.log(
-        "🟢 Adding new file. New openFiles:",
-        newFiles.map((f) => ({
-          id: f.fileSystemNode.id.toString(),
-          title: f.fileSystemNode.title,
-        }))
-      )
+
       setActiveFileId(nodeId)
       setSelectedFileNode(node)
       return newFiles

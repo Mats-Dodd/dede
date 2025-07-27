@@ -91,12 +91,6 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
       const fileNode = item as FileTreeNode
       // Only set selectedFileNode for actual files, not directories
       if (fileNode.type === "file") {
-        console.log(
-          "🌳 project-file-tree calling setSelectedFileNode for:",
-          fileNode.fileSystemNode.id.toString(),
-          "title:",
-          fileNode.fileSystemNode.title
-        )
         setSelectedFileNode(fileNode)
       }
     } else {

@@ -1,0 +1,3479 @@
+---
+title: Overview
+id: overview
+---
+
+# TanStack DB - Documentation
+
+Welcome to the TanStack DB documentation.
+
+TanStack DB is a reactive client store for building super fast apps on sync. It extends TanStack Query with collections, live queries and optimistic mutations.
+
+## Contents
+
+- [How it works](#how-it-works) &mdash; understand the TanStack DB development model and how the pieces fit together
+- [API reference](#api-reference) &mdash; for the primitives and function interfaces
+- [Usage examples](#usage-examples) &mdash; examples of common usage patterns
+- [More info](#more-info) &mdash; where to find support and more information
+
+## How it works
+
+TanStack DB works by:
+
+- [defining collections](#defining-collections) typed sets of objects that can be populated with data
+- [using live queries](#using-live-queries) to query data from/across collections
+- [making optimistic mutations](#making-optimistic-mutations) using transactional mutators
+
+```tsx
+// Define collections to load data into
+const todoCollection = createCollection({
+  // ...your config
+  onUpdate: updateMutationFn,
+})
+
+const Todos = () => {
+  // Bind data using live queries
+  const { data: todos } = useLiveQuery((q) =>
+    q.from({ todo: todoCollection }).where(({ todo }) => todo.completed)
+  )
+
+  const complete = (todo) => {
+    // Instantly applies optimistic state
+    todoCollection.update(todo.id, (draft) => {
+      draft.completed = true
+    })
+  }
+
+  return (
+    <ul>
+      {todos.map((todo) => (
+        <li key={todo.id} onClick={() => complete(todo)}>
+          {todo.text}
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+### Defining collections
+
+Collections are typed sets of objects that can be populated with data. They're designed to de-couple loading data into your app from binding data to your components.
+
+Collections can be populated in many ways, including:
+
+- fetching data, for example [from API endpoints using TanStack Query](https://tanstack.com/query/latest)
+- syncing data, for example [using a sync engine like ElectricSQL](https://electric-sql.com/)
+- storing local data, for example [using localStorage for user preferences and settings](#localstoragecollection) or [in-memory client data or UI state](#localonlycollection)
+- from live collection queries, creating [derived collections as materialised views](#using-live-queries)
+
+Once you have your data in collections, you can query across them using live queries in your components.
+
+### Using live queries
+
+Live queries are used to query data out of collections. Live queries are reactive: when the underlying data changes in a way that would affect the query result, the result is incrementally updated and returned from the query, triggering a re-render.
+
+TanStack DB live queries are implemented using [d2ts](https://github.com/electric-sql/d2ts), a Typescript implementation of differential dataflow. This allows the query results to update _incrementally_ (rather than by re-running the whole query). This makes them blazing fast, usually sub-millisecond, even for highly complex queries.
+
+Live queries support joins across collections. This allows you to:
+
+1. load normalised data into collections and then de-normalise it through queries; simplifying your backend by avoiding the need for bespoke API endpoints that match your client
+2. join data from multiple sources; for example, syncing some data out of a database, fetching some other data from an external API and then joining these into a unified data model for your front-end code
+
+Every query returns another collection which can _also_ be queried.
+
+For more details on live queries, see the [Live Queries](live-queries.md) documentation.
+
+### Making optimistic mutations
+
+Collections support `insert`, `update` and `delete` operations. When called, by default they trigger the corresponding `onInsert`, `onUpdate`, `onDelete` handlers which are responsible for writing the mutation to the backend.
+
+```ts
+// Define collection with persistence handlers
+const todoCollection = createCollection({
+  id: "todos",
+  // ... other config
+  onUpdate: async ({ transaction }) => {
+    const { original, changes } = transaction.mutations[0]
+    await api.todos.update(original.id, changes)
+  },
+})
+
+// Immediately applies optimistic state
+todoCollection.update(todo.id, (draft) => {
+  draft.completed = true
+})
+```
+
+Rather than mutating the collection data directly, the collection internally treats its synced/loaded data as immutable and maintains a separate set of local mutations as optimistic state. When live queries read from the collection, they see a local view that overlays the local optimistic mutations on-top-of the immutable synced data.
+
+The optimistic state is held until the `onUpdate` (in this case) handler resolves - at which point the data is persisted to the server and synced back to the local collection.
+
+If the handler throws an error, the optimistic state is rolled back.
+
+### Explicit transactions
+
+Mutations are based on a `Transaction` primitive.
+
+For simple state changes, directly mutating the collection and persisting with the operator handlers is enough.
+
+But for more complex use cases, you can directly create custom actions with `createOptimisticAction` or custom transactions with `createTransaction`. This lets you do things such as do transactions with multiple mutations across multiple collections, do chained transactions w/ intermediate rollbacks, etc.
+
+For example, in the following code, the mutationFn first sends the write to the server using `await api.todos.update(updatedTodo)` and then calls `await collection.refetch()` to trigger a re-fetch of the collection contents using TanStack Query. When this second await resolves, the collection is up-to-date with the latest changes and the optimistic state is safely discarded.
+
+```ts
+const updateTodo = createOptimisticAction<{ id: string }>({
+  onMutate,
+  mutationFn: async ({ transaction }) => {
+    const { collection, modified: updatedTodo } = transaction.mutations[0]
+
+    await api.todos.update(updatedTodo)
+    await collection.refetch()
+  },
+})
+```
+
+### Uni-directional data flow
+
+This combines to support a model of uni-directional data flow, extending the redux/flux style state management pattern beyond the client, to take in the server as well:
+
+<figure>
+  <a href="./unidirectional-data-flow.lg.png" target="_blank">
+    <img src="./unidirectional-data-flow.png" />
+  </a>
+</figure>
+
+With an instant inner loop of optimistic state, superseded in time by the slower outer loop of persisting to the server and syncing the updated server state back into the collection.
+
+## API reference
+
+### Collections
+
+There are a number of built-in collection types:
+
+1. [`QueryCollection`](#querycollection) to load data into collections using [TanStack Query](https://tanstack.com/query)
+2. [`ElectricCollection`](#electriccollection) to sync data into collections using [ElectricSQL](https://electric-sql.com)
+3. [`TrailBaseCollection`](#trailbasecollection) to sync data into collections using [TrailBase](https://trailbase.io)
+4. [`LocalStorageCollection`](#localstoragecollection) for small amounts of local-only state that syncs across browser tabs
+5. [`LocalOnlyCollection`](#localonlycollection) for in-memory client data or UI state
+
+You can also use:
+
+- use live collection queries to [derive collections from other collections](#derived-collections)
+- the [base Collection](#base-collection) to define your own collection types
+
+#### Collection schemas
+
+All collections optionally (though strongly recommended) support adding a `schema`.
+
+If provided, this must be a [Standard Schema](https://standardschema.dev) compatible schema instance, such as a [Zod](https://zod.dev) or [Effect](https://effect.website/docs/schema/introduction/) schema.
+
+The collection will use the schema to do client-side validation of optimistic mutations.
+
+The collection will use the schema for its type so if you provide a schema, you can't also pass in an explicit
+type (e.g. `createCollection<Todo>()`).
+
+#### `QueryCollection`
+
+[TanStack Query](https://tanstack.com/query) fetches data using managed queries. Use `queryCollectionOptions` to fetch data into a collection using TanStack Query:
+
+```ts
+import { createCollection } from "@tanstack/react-db"
+import { queryCollectionOptions } from "@tanstack/query-db-collection"
+
+const todoCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: ["todoItems"],
+    queryFn: async () => fetch("/api/todos"),
+    getKey: (item) => item.id,
+    schema: todoSchema, // any standard schema
+  })
+)
+```
+
+The collection will be populated with the query results.
+
+#### `ElectricCollection`
+
+[Electric](https://electric-sql.com) is a read-path sync engine for Postgres. It allows you to sync subsets of data out of a Postgres database, [through your API](https://electric-sql.com/blog/2024/11/21/local-first-with-your-existing-api), into a TanStack DB collection.
+
+Electric's main primitive for sync is a [Shape](https://electric-sql.com/docs/guides/shapes). Use `electricCollectionOptions` to sync a shape into a collection:
+
+```ts
+import { createCollection } from "@tanstack/react-db"
+import { electricCollectionOptions } from "@tanstack/electric-db-collection"
+
+export const todoCollection = createCollection(
+  electricCollectionOptions({
+    id: "todos",
+    shapeOptions: {
+      url: "https://example.com/v1/shape",
+      params: {
+        table: "todos",
+      },
+    },
+    getKey: (item) => item.id,
+    schema: todoSchema,
+  })
+)
+```
+
+The Electric collection requires two Electric-specific options:
+
+- `shapeOptions` &mdash; the Electric [ShapeStreamOptions](https://electric-sql.com/docs/api/clients/typescript#options) that define the [Shape](https://electric-sql.com/docs/guides/shapes) to sync into the collection; this includes the
+  - `url` to your sync engine; and
+  - `params` to specify the `table` to sync and any optional `where` clauses, etc.
+- `getKey` &mdash; identifies the id for the rows being synced into the collection
+
+A new collections doesn't start syncing until you call `collection.preload()` or you query it.
+
+Electric shapes allow you to filter data using where clauses:
+
+```ts
+export const myPendingTodos = createCollection(
+  electricCollectionOptions({
+    id: "todos",
+    shapeOptions: {
+      url: "https://example.com/v1/shape",
+      params: {
+        table: "todos",
+        where: `
+        status = 'pending'
+        AND
+        user_id = '${user.id}'
+      `,
+      },
+    },
+    getKey: (item) => item.id,
+    schema: todoSchema,
+  })
+)
+```
+
+> [!TIP]
+> Shape where clauses, used to filter the data you sync into `ElectricCollection`s, are different from the [live queries](#live-queries) you use to query data in components.
+>
+> Live queries are much more expressive than shapes, allowing you to query across collections, join, aggregate, etc. Shapes just contain filtered database tables and are used to populate the data in a collection.
+
+If you need more control over what data syncs into the collection, Electric allows you to [use your API](https://electric-sql.com/blog/2024/11/21/local-first-with-your-existing-api#filtering) as a proxy to both authorize and filter data.
+
+See the [Electric docs](https://electric-sql.com/docs/intro) for more information.
+
+#### `TrailBaseCollection`
+
+[TrailBase](https://trailbase.io) is an easy-to-self-host, single-executable application backend with built-in SQLite, a V8 JS runtime, auth, admin UIs and sync functionality.
+
+TrailBase lets you expose tables via [Record APIs](https://trailbase.io/documentation/apis_record/) and subscribe to changes when `enable_subscriptions` is set. Use `trailBaseCollectionOptions` to sync records into a collection:
+
+```ts
+import { createCollection } from "@tanstack/react-db"
+import { trailBaseCollectionOptions } from "@tanstack/trailbase-db-collection"
+import { initClient } from "trailbase"
+
+const trailBaseClient = initClient(`https://trailbase.io`)
+
+export const todoCollection = createCollection<SelectTodo, Todo>(
+  electricCollectionOptions({
+    id: "todos",
+    recordApi: trailBaseClient.records(`todos`),
+    getKey: (item) => item.id,
+    schema: todoSchema,
+    parse: {
+      created_at: (ts) => new Date(ts * 1000),
+    },
+    serialize: {
+      created_at: (date) => Math.floor(date.valueOf() / 1000),
+    },
+  })
+)
+```
+
+This collection requires the following TrailBase-specific options:
+
+- `recordApi` — identifies the API to sync.
+- `getKey` — identifies the id for the records being synced into the collection.
+- `parse` — maps `(v: Todo[k]) => SelectTodo[k]`.
+- `serialize` — maps `(v: SelectTodo[k]) => Todo[k]`.
+
+A new collections doesn't start syncing until you call `collection.preload()` or you query it.
+
+
+#### `LocalStorageCollection`
+
+localStorage collections store small amounts of local-only state that persists across browser sessions and syncs across browser tabs in real-time. All data is stored under a single localStorage key and automatically synchronized using storage events.
+
+Use `localStorageCollectionOptions` to create a collection that stores data in localStorage:
+
+```ts
+import { createCollection } from "@tanstack/react-db"
+import { localStorageCollectionOptions } from "@tanstack/react-db"
+
+export const userPreferencesCollection = createCollection(
+  localStorageCollectionOptions({
+    id: "user-preferences",
+    storageKey: "app-user-prefs", // localStorage key
+    getKey: (item) => item.id,
+    schema: userPrefsSchema,
+  })
+)
+```
+
+The localStorage collection requires:
+
+- `storageKey` — the localStorage key where all collection data is stored
+- `getKey` — identifies the id for items in the collection
+
+Mutation handlers (`onInsert`, `onUpdate`, `onDelete`) are completely optional. Data will persist to localStorage whether or not you provide handlers. You can provide alternative storage backends like `sessionStorage` or custom implementations that match the localStorage API.
+
+```ts
+export const sessionCollection = createCollection(
+  localStorageCollectionOptions({
+    id: "session-data",
+    storageKey: "session-key",
+    storage: sessionStorage, // Use sessionStorage instead
+    getKey: (item) => item.id,
+  })
+)
+```
+
+> [!TIP]
+> localStorage collections are perfect for user preferences, UI state, and other data that should persist locally but doesn't need server synchronization. For server-synchronized data, use [`QueryCollection`](#querycollection) or [`ElectricCollection`](#electriccollection) instead.
+
+#### `LocalOnlyCollection`
+
+LocalOnly collections are designed for in-memory client data or UI state that doesn't need to persist across browser sessions or sync across tabs. They provide a simple way to manage temporary, session-only data with full optimistic mutation support.
+
+Use `localOnlyCollectionOptions` to create a collection that stores data only in memory:
+
+```ts
+import { createCollection } from "@tanstack/react-db"
+import { localOnlyCollectionOptions } from "@tanstack/react-db"
+
+export const uiStateCollection = createCollection(
+  localOnlyCollectionOptions({
+    id: "ui-state",
+    getKey: (item) => item.id,
+    schema: uiStateSchema,
+    // Optional initial data to populate the collection
+    initialData: [
+      { id: "sidebar", isOpen: false },
+      { id: "theme", mode: "light" },
+    ],
+  })
+)
+```
+
+The LocalOnly collection requires:
+
+- `getKey` — identifies the id for items in the collection
+
+Optional configuration:
+
+- `initialData` — array of items to populate the collection with on creation
+- `onInsert`, `onUpdate`, `onDelete` — optional mutation handlers for custom logic
+
+Mutation handlers are completely optional. When provided, they are called before the optimistic state is confirmed. The collection automatically manages the transition from optimistic to confirmed state internally.
+
+```ts
+export const tempDataCollection = createCollection(
+  localOnlyCollectionOptions({
+    id: "temp-data",
+    getKey: (item) => item.id,
+    onInsert: async ({ transaction }) => {
+      // Custom logic before confirming the insert
+      console.log("Inserting:", transaction.mutations[0].modified)
+    },
+    onUpdate: async ({ transaction }) => {
+      // Custom logic before confirming the update
+      const { original, modified } = transaction.mutations[0]
+      console.log("Updating from", original, "to", modified)
+    },
+  })
+)
+```
+
+> [!TIP]
+> LocalOnly collections are perfect for temporary UI state, form data, or any client-side data that doesn't need persistence. For data that should persist across sessions, use [`LocalStorageCollection`](#localstoragecollection) instead.
+
+#### Derived collections
+
+Live queries return collections. This allows you to derive collections from other collections.
+
+For example:
+
+```ts
+import { createLiveQueryCollection, eq } from "@tanstack/db"
+
+// Imagine you have a collection of todos.
+const todoCollection = createCollection({
+  // config
+})
+
+// You can derive a new collection that's a subset of it.
+const completedTodoCollection = createLiveQueryCollection({
+  startSync: true,
+  query: (q) =>
+    q.from({ todo: todoCollection }).where(({ todo }) => todo.completed),
+})
+```
+
+This also works with joins to derive collections from multiple source collections. And it works recursively -- you can derive collections from other derived collections. Changes propagate efficiently using differential dataflow and it's collections all the way down.
+
+#### Collection
+
+There is a `Collection` interface in [`../packages/db/src/collection.ts`](../packages/db/src/collection.ts). You can use this to implement your own collection types.
+
+See the existing implementations in [`../packages/db`](../packages/db), [`../packages/query-db-collection`](../packages/query-db-collection), [`../packages/electric-db-collection`](../packages/electric-db-collection) and [`../packages/trailbase-db-collection`](../packages/trailbase-db-collection) for reference.
+
+### Live queries
+
+#### `useLiveQuery` hook
+
+Use the `useLiveQuery` hook to assign live query results to a state variable in your React components:
+
+```ts
+import { useLiveQuery } from '@tanstack/react-db'
+import { eq } from '@tanstack/db'
+
+const Todos = () => {
+  const { data: todos } = useLiveQuery((q) =>
+    q
+      .from({ todo: todoCollection })
+      .where(({ todo }) => eq(todo.completed, false))
+      .orderBy(({ todo }) => todo.created_at, 'asc')
+      .select(({ todo }) => ({
+        id: todo.id,
+        text: todo.text
+      }))
+  )
+
+  return <List items={ todos } />
+}
+```
+
+You can also query across collections with joins:
+
+```ts
+import { useLiveQuery } from '@tanstack/react-db'
+import { eq } from '@tanstack/db'
+
+const Todos = () => {
+  const { data: todos } = useLiveQuery((q) =>
+    q
+      .from({ todos: todoCollection })
+      .join(
+        { lists: listCollection },
+        ({ todos, lists }) => eq(lists.id, todos.listId),
+        'inner'
+      )
+      .where(({ lists }) => eq(lists.active, true))
+      .select(({ todos, lists }) => ({
+        id: todos.id,
+        title: todos.title,
+        listName: lists.name
+      }))
+  )
+
+  return <List items={ todos } />
+}
+```
+
+#### `queryBuilder`
+
+You can also build queries directly (outside of the component lifecycle) using the underlying `queryBuilder` API:
+
+```ts
+import { createLiveQueryCollection, eq } from "@tanstack/db"
+
+const completedTodos = createLiveQueryCollection({
+  startSync: true,
+  query: (q) =>
+    q
+      .from({ todo: todoCollection })
+      .where(({ todo }) => eq(todo.completed, true)),
+})
+
+const results = completedTodos.toArray
+```
+
+Note also that:
+
+1. the query results [are themselves a collection](#derived-collections)
+2. the `useLiveQuery` automatically starts and stops live query subscriptions when you mount and unmount your components; if you're creating queries manually, you need to manually manage the subscription lifecycle yourself
+
+See the [Live Queries](live-queries.md) documentation for more details.
+
+### Transactional mutators
+
+Transactional mutators allow you to batch and stage local changes across collections with:
+
+- immediate application of local optimistic updates
+- flexible mutationFns to handle writes, with automatic rollbacks and management of optimistic state
+
+#### `mutationFn`
+
+Mutators are created with a `mutationFn`. You can define a single, generic `mutationFn` for your whole app. Or you can define collection or mutation specific functions.
+
+The `mutationFn` is responsible for handling the local changes and processing them, usually to send them to a server or database to be stored, e.g.:
+
+```tsx
+import type { MutationFn } from "@tanstack/react-db"
+
+const mutationFn: MutationFn = async ({ transaction }) => {
+  const response = await api.todos.create(transaction.mutations)
+
+  if (!response.ok) {
+    // Throwing an error will rollback the optimistic state.
+    throw new Error(`HTTP Error: ${response.status}`)
+  }
+
+  const result = await response.json()
+
+  // Wait for the transaction to be synced back from the server
+  // before discarding the optimistic state.
+  const collection: Collection = transaction.mutations[0].collection
+  await collection.refetch()
+}
+```
+
+#### `createOptimisticAction`
+
+Use `createOptimisticAction` with your `mutationFn` and `onMutate` functions to create an action that you can use to mutate data in your components in fully custom ways:
+
+```tsx
+import { createOptimisticAction } from "@tanstack/react-db"
+
+// Create the `addTodo` action, passing in your `mutationFn` and `onMutate`.
+const addTodo = createOptimisticAction<string>({
+  onMutate: (text) => {
+    // Instantly applies the local optimistic state.
+    todoCollection.insert({
+      id: uuid(),
+      text,
+      completed: false,
+    })
+  },
+  mutationFn: async (text) => {
+    // Persist the todo to your backend
+    const response = await fetch("/api/todos", {
+      method: "POST",
+      body: JSON.stringify({ text, completed: false }),
+    })
+    return response.json()
+  },
+})
+
+const Todo = () => {
+  const handleClick = () => {
+    // Triggers the onMutate and then the mutationFn
+    addTodo("🔥 Make app faster")
+  }
+
+  return <Button onClick={handleClick} />
+}
+```
+
+## Manual Transactions
+
+By manually creating transactions, you can fully control their lifecycles and behaviors. `createOptimisticAction` is a ~25 line
+function which implements a common transaction pattern. Feel free to invent your own patterns!
+
+Here's one way you could use transactions.
+
+```ts
+import { createTransaction } from "@tanstack/react-db"
+
+const addTodoTx = createTransaction({
+  autoCommit: false,
+  mutationFn: async ({ transaction }) => {
+    // Persist data to backend
+    await Promise.all(transaction.mutations.map(mutation => {
+      return await api.saveTodo(mutation.modified)
+    })
+  },
+})
+
+// Apply first change
+addTodoTx.mutate(() => todoCollection.insert({ id: '1', text: 'First todo', completed: false }))
+
+// user reviews change
+
+// Apply another change
+addTodoTx.mutate(() => todoCollection.insert({ id: '2', text: 'Second todo', completed: false }))
+
+// User decides to save and we call .commit() and the mutations are persisted to the backend.
+addTodoTx.commit()
+```
+
+## Transaction lifecycle
+
+Transactions progress through the following states:
+
+1. `pending`: Initial state when a transaction is created and optimistic mutations can be applied
+2. `persisting`: Transaction is being persisted to the backend
+3. `completed`: Transaction has been successfully persisted and any backend changes have been synced back.
+4. `failed`: An error was thrown while persisting or syncing back the Transaction
+
+#### Write operations
+
+Collections support `insert`, `update` and `delete` operations.
+
+##### `insert`
+
+```typescript
+// Insert a single item
+myCollection.insert({ text: "Buy groceries", completed: false })
+
+// Insert multiple items
+insert([
+  { text: "Buy groceries", completed: false },
+  { text: "Walk dog", completed: false },
+])
+
+// Insert with optimistic updates disabled
+myCollection.insert(
+  { text: "Server-validated item", completed: false },
+  { optimistic: false }
+)
+
+// Insert with metadata and optimistic control
+myCollection.insert(
+  { text: "Custom item", completed: false },
+  {
+    metadata: { source: "import" },
+    optimistic: true, // default behavior
+  }
+)
+```
+
+##### `update`
+
+We use a proxy to capture updates as immutable draft optimistic updates.
+
+```typescript
+// Update a single item
+update(todo.id, (draft) => {
+  draft.completed = true
+})
+
+// Update multiple items
+update([todo1.id, todo2.id], (drafts) => {
+  drafts.forEach((draft) => {
+    draft.completed = true
+  })
+})
+
+// Update with metadata
+update(todo.id, { metadata: { reason: "user update" } }, (draft) => {
+  draft.text = "Updated text"
+})
+
+// Update without optimistic updates
+update(todo.id, { optimistic: false }, (draft) => {
+  draft.status = "server-validated"
+})
+
+// Update with both metadata and optimistic control
+update(
+  todo.id,
+  {
+    metadata: { reason: "admin update" },
+    optimistic: false,
+  },
+  (draft) => {
+    draft.priority = "high"
+  }
+)
+```
+
+##### `delete`
+
+```typescript
+// Delete a single item
+delete todo.id
+
+// Delete multiple items
+delete [todo1.id, todo2.id]
+
+// Delete with metadata
+delete (todo.id, { metadata: { reason: "completed" } })
+
+// Delete without optimistic updates (waits for server confirmation)
+delete (todo.id, { optimistic: false })
+
+// Delete with metadata and optimistic control
+delete (todo.id,
+{
+  metadata: { reason: "admin deletion" },
+  optimistic: false,
+})
+```
+
+#### Controlling optimistic behavior
+
+By default, all mutations (`insert`, `update`, `delete`) apply optimistic updates immediately to provide instant feedback in your UI. However, there are cases where you may want to disable this behavior and wait for server confirmation before applying changes locally.
+
+##### When to use `optimistic: false`
+
+Consider disabling optimistic updates when:
+
+- **Complex server-side processing**: Inserts that depend on server-side generation (e.g., cascading foreign keys, computed fields)
+- **Validation requirements**: Operations where backend validation might reject the change
+- **Confirmation workflows**: Deletes where UX should wait for confirmation before removing data
+- **Batch operations**: Large operations where optimistic rollback would be disruptive
+
+##### Behavior differences
+
+**`optimistic: true` (default)**:
+
+- Immediately applies mutation to the local store
+- Provides instant UI feedback
+- Requires rollback if server rejects the mutation
+- Best for simple, predictable operations
+
+**`optimistic: false`**:
+
+- Does not modify local store until server confirms
+- No immediate UI feedback, but no rollback needed
+- UI updates only after successful server response
+- Best for complex or validation-heavy operations
+
+```typescript
+// Example: Critical deletion that needs confirmation
+const handleDeleteAccount = () => {
+  // Don't remove from UI until server confirms
+  userCollection.delete(userId, { optimistic: false })
+}
+
+// Example: Server-generated data
+const handleCreateInvoice = () => {
+  // Server generates invoice number, tax calculations, etc.
+  invoiceCollection.insert(invoiceData, { optimistic: false })
+}
+
+// Example: Mixed approach in same transaction
+tx.mutate(() => {
+  // Instant UI feedback for simple change
+  todoCollection.update(todoId, (draft) => {
+    draft.completed = true
+  })
+
+  // Wait for server confirmation for complex change
+  auditCollection.insert(auditRecord, { optimistic: false })
+})
+```
+
+## Usage examples
+
+Here we illustrate two common ways of using TanStack DB:
+
+1. [using TanStack Query](#1-tanstack-query) with an existing REST API
+2. [using the ElectricSQL sync engine](#2-electricsql-sync) with a generic ingestion endpoint
+
+> [!TIP]
+> You can combine these patterns. One of the benefits of TanStack DB is that you can integrate different ways of loading data and handling mutations into the same app. Your components don't need to know where the data came from or goes.
+
+### 1. TanStack Query
+
+You can use TanStack DB with your existing REST API via TanStack Query.
+
+The steps are to:
+
+1. create [`QueryCollection`](#querycollection)s that load data using TanStack Query
+2. implement [`mutationFn`](#mutationfn)s that handle mutations by posting them to your API endpoints
+
+```tsx
+import { useLiveQuery, createCollection } from "@tanstack/react-db"
+import { queryCollectionOptions } from "@tanstack/electric-db-collection"
+
+// Load data into collections using TanStack Query.
+// It's common to define these in a `collections` module.
+const todoCollection = createCollection(queryCollectionOptions({
+  queryKey: ["todos"],
+  queryFn: async () => fetch("/api/todos"),
+  getKey: (item) => item.id,
+  schema: todoSchema, // any standard schema
+  onInsert: ({ transaction }) => {
+    const { changes: newTodo } = transaction.mutations[0]
+
+    // Handle the local write by sending it to your API.
+    await api.todos.create(newTodo)
+  }
+  // also add onUpdate, onDelete as needed.
+}))
+const listCollection = createCollection(queryCollectionOptions({
+  queryKey: ["todo-lists"],
+  queryFn: async () => fetch("/api/todo-lists"),
+  getKey: (item) => item.id,
+  schema: todoListSchema
+  onInsert: ({ transaction }) => {
+    const { changes: newTodo } = transaction.mutations[0]
+
+    // Handle the local write by sending it to your API.
+    await api.todoLists.create(newTodo)
+  }
+  // also add onUpdate, onDelete as needed.
+}))
+
+const Todos = () => {
+  // Read the data using live queries. Here we show a live
+  // query that joins across two collections.
+  const { data: todos } = useLiveQuery((q) =>
+    q
+      .from({ todo: todoCollection })
+      .join(
+        { list: listCollection },
+        ({ todo, list }) => eq(list.id, todo.list_id),
+        'inner'
+      )
+      .where(({ list }) => eq(list.active, true))
+      .select(({ todo, list }) => ({
+        id: todo.id,
+        text: todo.text,
+        status: todo.status,
+        listName: list.name
+      }))
+  )
+
+  // ...
+
+}
+```
+
+This pattern allows you to extend an existing TanStack Query application, or any application built on a REST API, with blazing fast, cross-collection live queries and local optimistic mutations with automatically managed optimistic state.
+
+### 2. ElectricSQL sync
+
+One of the most powerful ways of using TanStack DB is with a sync engine, for a fully local-first experience with real-time sync. This allows you to incrementally adopt sync into an existing app, whilst still handling writes with your existing API.
+
+Here, we illustrate this pattern using [ElectricSQL](https://electric-sql.com) as the sync engine.
+
+```tsx
+import type { Collection } from '@tanstack/db'
+import type { MutationFn, PendingMutation, createCollection } from '@tanstack/react-db'
+import { electricCollectionOptions } from '@tanstack/electric-db-collection'
+
+export const todoCollection = createCollection(electricCollectionOptions({
+  id: 'todos',
+  schema: todoSchema,
+  // Electric syncs data using "shapes". These are filtered views
+  // on database tables that Electric keeps in sync for you.
+  shapeOptions: {
+    url: 'https://api.electric-sql.cloud/v1/shape',
+    params: {
+      table: 'todos'
+    }
+  },
+  getKey: (item) => item.id,
+  schema: todoSchema
+  onInsert: ({ transaction }) => {
+    const response = await api.todos.create(transaction.mutations[0].modified)
+
+    return { txid: response.txid}
+  }
+  // You can also implement onUpdate, onDelete as needed.
+}))
+
+const AddTodo = () => {
+  return (
+    <Button
+      onClick={() =>
+        todoCollection.insert({ text: "🔥 Make app faster" })
+      }
+    />
+  )
+}
+```
+
+## More info
+
+If you have questions / need help using TanStack DB, let us know on the Discord or start a GitHub discussion:
+
+- [`#db` channel in the TanStack discord](https://discord.gg/yjUNbvbraC)
+- [GitHub discussions](https://github.com/tanstack/db/discussions)
+
+
+---
+title: Live Queries
+id: live-queries
+---
+
+# TanStack DB Live Queries
+
+TanStack DB provides a powerful, type-safe query system that allows you to fetch, filter, transform, and aggregate data from collections using a SQL-like fluent API. All queries are **live** by default, meaning they automatically update when the underlying data changes.
+
+The query system is built around an API similar to SQL query builders like Kysely or Drizzle where you chain methods together to compose your query. The query builder doesn't perform operations in the order of method calls - instead, it composes your query into an optimal incremental pipeline that gets compiled and executed efficiently. Each method returns a new query builder, allowing you to chain operations together.
+
+Live queries resolve to collections that automatically update when their underlying data changes. You can subscribe to changes, iterate over results, and use all the standard collection methods.
+
+```ts
+import { createCollection, liveQueryCollectionOptions, eq } from '@tanstack/db'
+
+const activeUsers = createCollection(liveQueryCollectionOptions({
+  query: (q) =>
+    q
+      .from({ user: usersCollection })
+      .where(({ user }) => eq(user.active, true))
+      .select(({ user }) => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      }))
+}))
+```
+
+The result types are automatically inferred from your query structure, providing full TypeScript support. When you use a `select` clause, the result type matches your projection. Without `select`, you get the full schema with proper join optionality.
+
+## Table of Contents
+
+- [Creating Live Query Collections](#creating-live-query-collections)
+- [From Clause](#from-clause)
+- [Where Clauses](#where-clauses)
+- [Select Projections](#select-projections)
+- [Joins](#joins)
+- [Subqueries](#subqueries)
+- [groupBy and Aggregations](#groupby-and-aggregations)
+- [Order By, Limit, and Offset](#order-by-limit-and-offset)
+- [Composable Queries](#composable-queries)
+- [Expression Functions Reference](#expression-functions-reference)
+- [Functional Variants](#functional-variants)
+
+## Creating Live Query Collections
+
+To create a live query collection, you can use `liveQueryCollectionOptions` with `createCollection`, or use the convenience function `createLiveQueryCollection`.
+
+### Using liveQueryCollectionOptions
+
+The fundamental way to create a live query is using `liveQueryCollectionOptions` with `createCollection`:
+
+```ts
+import { createCollection, liveQueryCollectionOptions, eq } from '@tanstack/db'
+
+const activeUsers = createCollection(liveQueryCollectionOptions({
+  query: (q) =>
+    q
+      .from({ user: usersCollection })
+      .where(({ user }) => eq(user.active, true))
+      .select(({ user }) => ({
+        id: user.id,
+        name: user.name,
+      }))
+}))
+```
+
+### Configuration Options
+
+For more control, you can specify additional options:
+
+```ts
+const activeUsers = createCollection(liveQueryCollectionOptions({
+  id: 'active-users', // Optional: auto-generated if not provided
+  query: (q) =>
+    q
+      .from({ user: usersCollection })
+      .where(({ user }) => eq(user.active, true))
+      .select(({ user }) => ({
+        id: user.id,
+        name: user.name,
+      })),
+  getKey: (user) => user.id, // Optional: uses stream key if not provided
+  startSync: true, // Optional: starts sync immediately
+}))
+```
+| Option | Type | Description |
+|--------|------|-------------|
+| `id` | `string` (optional) | An optional unique identifier for the live query. If not provided, it will be auto-generated. This is useful for debugging and logging. |
+| `query` | `QueryBuilder` or function | The query definition, this is either a `Query` instance or a function that returns a `Query` instance. |
+| `getKey` | `(item) => string \| number` (optional) | A function that extracts a unique key from each row. If not provided, the stream's internal key will be used. For simple cases this is the key from the parent collection, but in the case of joins, the auto-generated key will be a composite of the parent keys. Using `getKey` is useful when you want to use a specific key from a parent collection for the resulting collection. |
+| `schema` | `Schema` (optional) | Optional schema for validation |
+| `startSync` | `boolean` (optional) | Whether to start syncing immediately. Defaults to `true`. |
+| `gcTime` | `number` (optional) | Garbage collection time in milliseconds. Defaults to `5000` (5 seconds). |
+
+### Convenience Function
+
+For simpler cases, you can use `createLiveQueryCollection` as a shortcut:
+
+```ts
+import { createLiveQueryCollection, eq } from '@tanstack/db'
+
+const activeUsers = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .where(({ user }) => eq(user.active, true))
+    .select(({ user }) => ({
+      id: user.id,
+      name: user.name,
+    }))
+)
+```
+
+### Using with Frameworks
+
+In React, you can use the `useLiveQuery` hook:
+
+```tsx
+import { useLiveQuery } from '@tanstack/react-db'
+
+function UserList() {
+  const activeUsers = useLiveQuery((q) =>
+    q
+      .from({ user: usersCollection })
+      .where(({ user }) => eq(user.active, true))
+  )
+
+  return (
+    <ul>
+      {activeUsers.map(user => (
+        <li key={user.id}>{user.name}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+For more details on framework integration, see the [React](/docs/framework/react/adapter) and [Vue](/docs/framework/vue/adapter) adapter documentation.
+
+## From Clause
+
+The foundation of every query is the `from` method, which specifies the source collection or subquery. You can alias the source using object syntax.
+
+### Method Signature
+
+```ts
+from({
+  [alias]: Collection | Query,
+}): Query
+```
+
+**Parameters:**
+- `[alias]` - A Collection or Query instance. Note that only a single aliased collection or subquery is allowed in the `from` clause.
+
+### Basic Usage
+
+Start with a basic query that selects all records from a collection:
+
+```ts
+const allUsers = createCollection(liveQueryCollectionOptions({
+  query: (q) => q.from({ user: usersCollection })
+}))
+```
+
+The result contains all users with their full schema. You can iterate over the results or access them by key:
+
+```ts
+// Get all users as an array
+const users = allUsers.toArray
+
+// Get a specific user by ID
+const user = allUsers.get(1)
+
+// Check if a user exists
+const hasUser = allUsers.has(1)
+```
+
+Use aliases to make your queries more readable, especially when working with multiple collections:
+
+```ts
+const users = createCollection(liveQueryCollectionOptions({
+  query: (q) => q.from({ u: usersCollection })
+}))
+
+// Access fields using the alias
+const userNames = createCollection(liveQueryCollectionOptions({
+  query: (q) =>
+    q
+      .from({ u: usersCollection })
+      .select(({ u }) => ({
+        name: u.name,
+        email: u.email,
+      }))
+}))
+```
+
+## Where Clauses
+
+Use `where` clauses to filter your data based on conditions. You can chain multiple `where` calls - they are combined with `and` logic.
+
+The `where` method takes a callback function that receives an object containing your table aliases and returns a boolean expression. You build these expressions using comparison functions like `eq()`, `gt()`, and logical operators like `and()` and `or()`. This declarative approach allows the query system to optimize your filters efficiently. These are described in more detail in the [Expression Functions Reference](#expression-functions-reference) section. This is very similar to how you construct queries using Kysely or Drizzle.
+
+It's important to note that the `where` method is not a function that is executed on each row or the results, its a way to describe the query that will be executed. This declarative approach works well for almost all use cases, but if you need to use a more complex condition, there is the functional variant as `fn.where` which is described in the [Functional Variants](#functional-variants) section.
+
+### Method Signature
+
+```ts
+where(
+  condition: (row: TRow) => Expression<boolean>
+): Query
+```
+
+**Parameters:**
+- `condition` - A callback function that receives the row object with table aliases and returns a boolean expression
+
+### Basic Filtering
+
+Filter users by a simple condition:
+
+```ts
+import { eq } from '@tanstack/db'
+
+const activeUsers = createCollection(liveQueryCollectionOptions({
+  query: (q) =>
+    q
+      .from({ user: usersCollection })
+      .where(({ user }) => eq(user.active, true))
+}))
+```
+
+### Multiple Conditions
+
+Chain multiple `where` calls for AND logic:
+
+```ts
+import { eq, gt } from '@tanstack/db'
+
+const adultActiveUsers = createCollection(liveQueryCollectionOptions({
+  query: (q) =>
+    q
+      .from({ user: usersCollection })
+      .where(({ user }) => eq(user.active, true))
+      .where(({ user }) => gt(user.age, 18))
+}))
+```
+
+### Complex Conditions
+
+Use logical operators to build complex conditions:
+
+```ts
+import { eq, gt, or, and } from '@tanstack/db'
+
+const specialUsers = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .where(({ user }) => 
+      and(
+        eq(user.active, true),
+        or(
+          gt(user.age, 25),
+          eq(user.role, 'admin')
+        )
+      )
+    )
+)
+```
+
+### Available Operators
+
+The query system provides several comparison operators:
+
+```ts
+import { eq, gt, gte, lt, lte, like, ilike, inArray, and, or, not } from '@tanstack/db'
+
+// Equality
+eq(user.id, 1)
+
+// Comparisons
+gt(user.age, 18)    // greater than
+gte(user.age, 18)   // greater than or equal
+lt(user.age, 65)    // less than
+lte(user.age, 65)   // less than or equal
+
+// String matching
+like(user.name, 'John%')    // case-sensitive pattern matching
+ilike(user.name, 'john%')   // case-insensitive pattern matching
+
+// Array membership
+inArray(user.id, [1, 2, 3])
+
+// Logical operators
+and(condition1, condition2)
+or(condition1, condition2)
+not(condition)
+```
+
+For a complete reference of all available functions, see the [Expression Functions Reference](#expression-functions-reference) section.
+
+## Select
+
+Use `select` to specify which fields to include in your results and transform your data. Without `select`, you get the full schema.
+
+Similar to the `where` clause, the `select` method takes a callback function that receives an object containing your table aliases and returns an object with the fields you want to include in your results. These can be combined with functions from the [Expression Functions Reference](#expression-functions-reference) section to create computed fields. You can also use the spread operator to include all fields from a table.
+
+### Method Signature
+
+```ts
+select(
+  projection: (row: TRow) => Record<string, Expression>
+): Query
+```
+
+**Parameters:**
+- `projection` - A callback function that receives the row object with table aliases and returns the selected fields object
+
+### Basic Selects
+
+Select specific fields from your data:
+
+````ts
+const userNames = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .select(({ user }) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+    }))
+)
+
+/*
+Result type: { id: number, name: string, email: string }
+
+```ts
+for (const row of userNames) {
+  console.log(row.name)
+}
+```
+*/
+````
+
+### Field Renaming
+
+Rename fields in your results:
+
+```ts
+const userProfiles = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .select(({ user }) => ({
+      userId: user.id,
+      fullName: user.name,
+      contactEmail: user.email,
+    }))
+)
+```
+
+### Computed Fields
+
+Create computed fields using expressions:
+
+```ts
+import { gt, length } from '@tanstack/db'
+
+const userStats = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .select(({ user }) => ({
+      id: user.id,
+      name: user.name,
+      isAdult: gt(user.age, 18),
+      nameLength: length(user.name),
+    }))
+)
+```
+
+### Using Functions and Including All Fields
+
+Transform your data using built-in functions:
+
+````ts
+import { concat, upper, gt } from '@tanstack/db'
+
+const formattedUsers = createCollection(liveQueryCollectionOptions({
+  query: (q) =>
+    q
+      .from({ user: usersCollection })
+      .select(({ user }) => ({
+        ...user, // Include all user fields
+        displayName: upper(concat(user.firstName, ' ', user.lastName)),
+        isAdult: gt(user.age, 18),
+      }))
+}))
+
+/*
+Result type:
+{
+  id: number,
+  name: string,
+  email: string,
+  displayName: string,
+  isAdult: boolean,
+}
+*/
+````
+
+For a complete list of available functions, see the [Expression Functions Reference](#expression-functions-reference) section.
+
+## Joins
+
+Use `join` to combine data from multiple collections. Joins default to `left` join type and only support equality conditions.
+
+Joins in TanStack DB are a way to combine data from multiple collections, and are conceptually very similar to SQL joins. When two collections are joined, the result is a new collection that contains the combined data as single rows. The new collection is a live query collection, and will automatically update when the underlying data changes.
+
+A `join` without a `select` will return row objects that are namespaced with the aliases of the joined collections.
+
+The result type of a join will take into account the join type, with the optionality of the joined fields being determined by the join type.
+
+> [!NOTE]
+> We are working on an `include` system that will enable joins that project to a hierarchical object. For example an `issue` row could have a `comments` property that is an array of `comment` rows.
+> See [this issue](https://github.com/TanStack/db/issues/288) for more details.
+
+### Method Signature
+
+```ts
+join(
+  { [alias]: Collection | Query },
+  condition: (row: TRow) => Expression<boolean>, // Must be an `eq` condition
+  joinType?: 'left' | 'right' | 'inner' | 'full'
+): Query
+```
+
+**Parameters:**
+- `aliases` - An object where keys are alias names and values are collections or subqueries to join
+- `condition` - A callback function that receives the combined row object and returns an equality condition
+- `joinType` - Optional join type: `'left'` (default), `'right'`, `'inner'`, or `'full'`
+
+### Basic Joins
+
+Join users with their posts:
+
+````ts
+const userPosts = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .join({ post: postsCollection }, ({ user, post }) => 
+      eq(user.id, post.userId)
+    )
+)
+
+/*
+Result type: 
+{ 
+  user: User,
+  post?: Post, // post is optional because it is a left join
+}
+
+```ts
+for (const row of userPosts) {
+  console.log(row.user.name, row.post?.title)
+}
+```
+*/
+````
+
+### Join Types
+
+Specify the join type as the third parameter:
+
+```ts
+const activeUserPosts = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .join(
+      { post: postsCollection }, 
+      ({ user, post }) => eq(user.id, post.userId),
+      'inner', // `inner`, `left`, `right` or `full`
+    )
+)
+```
+
+Or using the aliases `leftJoin`, `rightJoin`, `innerJoin` and `fullJoin` methods:
+
+### Left Join
+```ts
+// Left join - all users, even without posts
+const allUsers = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .leftJoin(
+      { post: postsCollection }, 
+      ({ user, post }) => eq(user.id, post.userId),
+    )
+)
+
+/*
+Result type:
+{
+  user: User,
+  post?: Post, // post is optional because it is a left join
+}
+*/
+```
+
+### Right Join
+
+```ts
+// Right join - all posts, even without users
+const allPosts = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .rightJoin(
+      { post: postsCollection }, 
+      ({ user, post }) => eq(user.id, post.userId),
+    )
+)
+
+/*
+Result type:
+{
+  user?: User, // user is optional because it is a right join
+  post: Post,
+}
+*/
+```
+
+### Inner Join
+
+```ts
+// Inner join - only matching records
+const activeUserPosts = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .innerJoin(
+      { post: postsCollection }, 
+      ({ user, post }) => eq(user.id, post.userId),
+    )
+)
+
+/*
+Result type:
+{
+  user: User,
+  post: Post,
+}
+*/
+```
+
+### Full Join
+
+```ts
+// Full join - all users and all posts
+const allUsersAndPosts = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .fullJoin(
+      { post: postsCollection }, 
+      ({ user, post }) => eq(user.id, post.userId),
+    )
+)
+
+/*
+Result type:
+{
+  user?: User, // user is optional because it is a full join
+  post?: Post, // post is optional because it is a full join
+}
+*/
+```
+
+### Multiple Joins
+
+Chain multiple joins in a single query:
+
+```ts
+const userPostComments = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .join({ post: postsCollection }, ({ user, post }) => 
+      eq(user.id, post.userId)
+    )
+    .join({ comment: commentsCollection }, ({ post, comment }) => 
+      eq(post.id, comment.postId)
+    )
+    .select(({ user, post, comment }) => ({
+      userName: user.name,
+      postTitle: post.title,
+      commentText: comment.text,
+    }))
+)
+```
+
+## Subqueries
+
+Subqueries allow you to use the result of one query as input to another, they are embedded within the query itself and are compile to a single query pipeline. They are very similar to SQL subqueries that are executed as part of a single operation.
+
+Note that subqueries are not the same as using a live query result in a `from` or `join` clause in a new query. When you do that the intermediate result is fully computed and accessible to you, subqueries are internal to their parent query and not materialised to a collection themselves and so are more efficient.
+
+See the [Caching Intermediate Results](#caching-intermediate-results) section for more details on using live query results in a `from` or `join` clause in a new query.
+
+### Subqueries in `from` Clauses
+
+Use a subquery as the main source:
+
+```ts
+const activeUserPosts = createCollection(liveQueryCollectionOptions({
+  query: (q) => {
+    // Build the subquery first
+    const activeUsers = q
+      .from({ user: usersCollection })
+      .where(({ user }) => eq(user.active, true))
+    
+    // Use the subquery in the main query
+    return q
+      .from({ activeUser: activeUsers })
+      .join({ post: postsCollection }, ({ activeUser, post }) => 
+        eq(activeUser.id, post.userId)
+      )
+  }
+}))
+```
+
+### Subqueries in `join` Clauses
+
+Join with a subquery result:
+
+```ts
+const userRecentPosts = createCollection(liveQueryCollectionOptions({
+  query: (q) => {
+    // Build the subquery first
+    const recentPosts = q
+      .from({ post: postsCollection })
+      .where(({ post }) => gt(post.createdAt, '2024-01-01'))
+      .orderBy(({ post }) => post.createdAt, 'desc')
+      .limit(1)
+    
+    // Use the subquery in the main query
+    return q
+      .from({ user: usersCollection })
+      .join({ recentPost: recentPosts }, ({ user, recentPost }) => 
+        eq(user.id, recentPost.userId)
+      )
+  }
+}))
+```
+
+### Subquery deduplication  
+
+When the same subquery is used multiple times within a query, it's automatically deduplicated and executed only once:
+
+```ts
+const complexQuery = createCollection(liveQueryCollectionOptions({
+  query: (q) => {
+    // Build the subquery once
+    const activeUsers = q
+      .from({ user: usersCollection })
+      .where(({ user }) => eq(user.active, true))
+    
+    // Use the same subquery multiple times
+    return q
+      .from({ activeUser: activeUsers })
+      .join({ post: postsCollection }, ({ activeUser, post }) => 
+        eq(activeUser.id, post.userId)
+      )
+      .join({ comment: commentsCollection }, ({ activeUser, comment }) => 
+        eq(activeUser.id, comment.userId)
+      )
+  }
+}))
+```
+
+In this example, the `activeUsers` subquery is used twice but executed only once, improving performance.
+
+### Complex Nested Subqueries
+
+Build complex queries with multiple levels of nesting:
+
+```ts
+import { count } from '@tanstack/db'
+
+const topUsers = createCollection(liveQueryCollectionOptions({
+  query: (q) => {
+    // Build the post count subquery
+    const postCounts = q
+      .from({ post: postsCollection })
+      .groupBy(({ post }) => post.userId)
+      .select(({ post }) => ({
+        userId: post.userId,
+        count: count(post.id),
+      }))
+    
+    // Build the user stats subquery
+    const userStats = q
+      .from({ user: usersCollection })
+      .join({ postCount: postCounts }, ({ user, postCount }) => 
+        eq(user.id, postCount.userId)
+      )
+      .select(({ user, postCount }) => ({
+        id: user.id,
+        name: user.name,
+        postCount: postCount.count,
+      }))
+      .orderBy(({ userStats }) => userStats.postCount, 'desc')
+      .limit(10)
+    
+    // Use the user stats subquery in the main query
+    return q.from({ userStats })
+  }
+}))
+```
+
+## groupBy and Aggregations
+
+Use `groupBy` to group your data and apply aggregate functions. When you use aggregates in `select` without `groupBy`, the entire result set is treated as a single group.
+
+### Method Signature
+
+```ts
+groupBy(
+  grouper: (row: TRow) => Expression | Expression[]
+): Query
+```
+
+**Parameters:**
+- `grouper` - A callback function that receives the row object and returns the grouping key(s). Can return a single value or an array for multi-column grouping
+
+### Basic Grouping
+
+Group users by their department and count them:
+
+```ts
+import { count, avg } from '@tanstack/db'
+
+const departmentStats = createCollection(liveQueryCollectionOptions({
+  query: (q) =>
+    q
+      .from({ user: usersCollection })
+      .groupBy(({ user }) => user.departmentId)
+      .select(({ user }) => ({
+        departmentId: user.departmentId,
+        userCount: count(user.id),
+        avgAge: avg(user.age),
+      }))
+}))
+```
+
+> [!NOTE]
+> In `groupBy` queries, the properties in your `select` clause must either be:
+> - An aggregate function (like `count`, `sum`, `avg`)
+> - A property that was used in the `groupBy` clause
+> 
+> You cannot select properties that are neither aggregated nor grouped.
+
+### Multiple Column Grouping
+
+Group by multiple columns by returning an array from the callback:
+
+```ts
+const userStats = createCollection(liveQueryCollectionOptions({
+  query: (q) =>
+    q
+      .from({ user: usersCollection })
+      .groupBy(({ user }) => [user.departmentId, user.role])
+      .select(({ user }) => ({
+        departmentId: user.departmentId,
+        role: user.role,
+        count: count(user.id),
+        avgSalary: avg(user.salary),
+      }))
+}))
+```
+
+### Aggregate Functions
+
+Use various aggregate functions to summarize your data:
+
+```ts
+import { count, sum, avg, min, max } from '@tanstack/db'
+
+const orderStats = createCollection(liveQueryCollectionOptions({
+  query: (q) =>
+    q
+      .from({ order: ordersCollection })
+      .groupBy(({ order }) => order.customerId)
+      .select(({ order }) => ({
+        customerId: order.customerId,
+        totalOrders: count(order.id),
+        totalAmount: sum(order.amount),
+        avgOrderValue: avg(order.amount),
+        minOrder: min(order.amount),
+        maxOrder: max(order.amount),
+      }))
+}))
+```
+
+See the [Aggregate Functions](#aggregate-functions) section for a complete list of available aggregate functions.
+
+### Having Clauses
+
+Filter aggregated results using `having` - this is similar to the `where` clause, but is applied after the aggregation has been performed.
+
+#### Method Signature
+
+```ts
+having(
+  condition: (row: TRow) => Expression<boolean>
+): Query
+```
+
+**Parameters:**
+- `condition` - A callback function that receives the aggregated row object and returns a boolean expression
+
+```ts
+const highValueCustomers = createLiveQueryCollection((q) =>
+  q
+    .from({ order: ordersCollection })
+    .groupBy(({ order }) => order.customerId)
+    .select(({ order }) => ({
+      customerId: order.customerId,
+      totalSpent: sum(order.amount),
+      orderCount: count(order.id),
+    }))
+    .having(({ order }) => gt(sum(order.amount), 1000))
+)
+```
+
+### Implicit Single-Group Aggregation
+
+When you use aggregates without `groupBy`, the entire result set is grouped:
+
+```ts
+const overallStats = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .select(({ user }) => ({
+      totalUsers: count(user.id),
+      avgAge: avg(user.age),
+      maxSalary: max(user.salary),
+    }))
+)
+```
+
+This is equivalent to grouping the entire collection into a single group.
+
+### Accessing Grouped Data
+
+Grouped results can be accessed by the group key:
+
+```ts
+const deptStats = createCollection(liveQueryCollectionOptions({
+  query: (q) =>
+    q
+      .from({ user: usersCollection })
+      .groupBy(({ user }) => user.departmentId)
+      .select(({ user }) => ({
+        departmentId: user.departmentId,
+        count: count(user.id),
+      }))
+}))
+
+// Access by department ID
+const engineeringStats = deptStats.get(1)
+```
+
+> **Note**: Grouped results are keyed differently based on the grouping:
+> - **Single column grouping**: Keyed by the actual value (e.g., `deptStats.get(1)`)
+> - **Multiple column grouping**: Keyed by a JSON string of the grouped values (e.g., `userStats.get('[1,"admin"]')`)
+
+## Order By, Limit, and Offset
+
+Use `orderBy`, `limit`, and `offset` to control the order and pagination of your results. Ordering is performed incrementally for optimal performance.
+
+### Method Signatures
+
+```ts
+orderBy(
+  selector: (row: TRow) => Expression,
+  direction?: 'asc' | 'desc'
+): Query
+
+limit(count: number): Query
+
+offset(count: number): Query
+```
+
+**Parameters:**
+- `selector` - A callback function that receives the row object and returns the value to sort by
+- `direction` - Sort direction: `'asc'` (default) or `'desc'`
+- `count` - Number of rows to limit or skip
+
+### Basic Ordering
+
+Sort results by a single column:
+
+```ts
+const sortedUsers = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .orderBy(({ user }) => user.name)
+    .select(({ user }) => ({
+      id: user.id,
+      name: user.name,
+    }))
+)
+```
+
+### Multiple Column Ordering
+
+Order by multiple columns:
+
+```ts
+const sortedUsers = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .orderBy(({ user }) => user.departmentId, 'asc')
+    .orderBy(({ user }) => user.name, 'asc')
+    .select(({ user }) => ({
+      id: user.id,
+      name: user.name,
+      departmentId: user.departmentId,
+    }))
+)
+```
+
+### Descending Order
+
+Use `desc` for descending order:
+
+```ts
+const recentPosts = createLiveQueryCollection((q) =>
+  q
+    .from({ post: postsCollection })
+    .orderBy(({ post }) => post.createdAt, 'desc')
+    .select(({ post }) => ({
+      id: post.id,
+      title: post.title,
+      createdAt: post.createdAt,
+    }))
+)
+```
+
+### Pagination with `limit` and `offset`
+
+Skip results using `offset`:
+
+```ts
+const page2Users = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .orderBy(({ user }) => user.name, 'asc')
+    .limit(20)
+    .offset(20) // Skip first 20 results
+    .select(({ user }) => ({
+      id: user.id,
+      name: user.name,
+    }))
+)
+```
+
+## Composable Queries
+
+Build complex queries by composing smaller, reusable parts. This approach makes your queries more maintainable and allows for better performance through caching.
+
+### Conditional Query Building
+
+Build queries based on runtime conditions:
+
+```ts
+import { Query, eq } from '@tanstack/db'
+
+function buildUserQuery(options: { activeOnly?: boolean; limit?: number }) {
+  let query = new Query().from({ user: usersCollection })
+  
+  if (options.activeOnly) {
+    query = query.where(({ user }) => eq(user.active, true))
+  }
+  
+  if (options.limit) {
+    query = query.limit(options.limit)
+  }
+  
+  return query.select(({ user }) => ({
+    id: user.id,
+    name: user.name,
+  }))
+}
+
+const activeUsers = createLiveQueryCollection(buildUserQuery({ activeOnly: true, limit: 10 }))
+```
+
+### Caching Intermediate Results
+
+The result of a live query collection is a collection itself, and will automatically update when the underlying data changes. This means that you can use the result of a live query collection as a source in another live query collection. This pattern is useful for building complex queries where you want to cache intermediate results to make further queries faster.
+
+```ts
+// Base query for active users
+const activeUsers = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .where(({ user }) => eq(user.active, true))
+)
+
+// Query that depends on active users
+const activeUserPosts = createLiveQueryCollection((q) =>
+  q
+    .from({ user: activeUsers })
+    .join({ post: postsCollection }, ({ user, post }) => 
+      eq(user.id, post.userId)
+    )
+    .select(({ user, post }) => ({
+      userName: user.name,
+      postTitle: post.title,
+    }))
+)
+```
+
+### Reusable Query Definitions
+
+You can use the `Query` class to create reusable query definitions. This is useful for building complex queries where you want to reuse the same query builder instance multiple times throughout your application.
+
+```ts
+import { Query, eq } from '@tanstack/db'
+
+// Create a reusable query builder
+const userQuery = new Query()
+  .from({ user: usersCollection })
+  .where(({ user }) => eq(user.active, true))
+
+// Use it in different contexts
+const activeUsers = createLiveQueryCollection({
+  query: userQuery.select(({ user }) => ({
+    id: user.id,
+    name: user.name,
+  }))
+})
+
+// Or as a subquery
+const userPosts = createLiveQueryCollection((q) =>
+  q
+    .from({ activeUser: userQuery })
+    .join({ post: postsCollection }, ({ activeUser, post }) => 
+      eq(activeUser.id, post.userId)
+    )
+)
+```
+
+### Reusable Callback Functions
+
+Use `Ref<MyType>` to create reusable callback functions:
+
+```ts
+import { Ref, eq, gt, and } from '@tanstack/db'
+
+// Create reusable callbacks
+const isActiveUser = (user: Ref<User>) => eq(user.active, true)
+const isAdultUser = (user: Ref<User>) => gt(user.age, 18)
+
+// Use them in queries
+const activeAdults = createCollection(liveQueryCollectionOptions({
+  query: (q) =>
+    q
+      .from({ user: usersCollection })
+      .where(({ user }) => and(isActiveUser(user), isAdultUser(user)))
+      .select(({ user }) => ({
+        id: user.id,
+        name: user.name,
+        age: user.age,
+      }))
+}))
+```
+
+You can also create callbacks that take the whole row and pass them directly to `where`:
+
+```ts
+// Callback that takes the whole row
+const isHighValueCustomer = (row: { user: User; order: Order }) => 
+  row.user.active && row.order.amount > 1000
+
+// Use directly in where clause
+const highValueCustomers = createCollection(liveQueryCollectionOptions({
+  query: (q) =>
+    q
+      .from({ user: usersCollection })
+      .join({ order: ordersCollection }, ({ user, order }) => 
+        eq(user.id, order.userId)
+      )
+      .where(isHighValueCustomer)
+      .select(({ user, order }) => ({
+        userName: user.name,
+        orderAmount: order.amount,
+      }))
+}))
+```
+
+This approach makes your query logic more modular and testable.
+
+## Expression Functions Reference
+
+The query system provides a comprehensive set of functions for filtering, transforming, and aggregating data.
+
+### Comparison Operators
+
+#### `eq(left, right)`
+Equality comparison:
+```ts
+eq(user.id, 1)
+eq(user.name, 'John')
+```
+
+#### `gt(left, right)`, `gte(left, right)`, `lt(left, right)`, `lte(left, right)`
+Numeric, string and date comparisons:
+```ts
+gt(user.age, 18)
+gte(user.salary, 50000)
+lt(user.createdAt, new Date('2024-01-01'))
+lte(user.rating, 5)
+```
+
+#### `inArray(value, array)`
+Check if a value is in an array:
+```ts
+inArray(user.id, [1, 2, 3])
+inArray(user.role, ['admin', 'moderator'])
+```
+
+#### `like(value, pattern)`, `ilike(value, pattern)`
+String pattern matching:
+```ts
+like(user.name, 'John%')    // Case-sensitive
+ilike(user.email, '%@gmail.com')  // Case-insensitive
+```
+
+### Logical Operators
+
+#### `and(...conditions)`
+Combine conditions with AND logic:
+```ts
+and(
+  eq(user.active, true),
+  gt(user.age, 18),
+  eq(user.role, 'user')
+)
+```
+
+#### `or(...conditions)`
+Combine conditions with OR logic:
+```ts
+or(
+  eq(user.role, 'admin'),
+  eq(user.role, 'moderator')
+)
+```
+
+#### `not(condition)`
+Negate a condition:
+```ts
+not(eq(user.active, false))
+```
+
+### String Functions
+
+#### `upper(value)`, `lower(value)`
+Convert case:
+```ts
+upper(user.name)  // 'JOHN'
+lower(user.email) // 'john@example.com'
+```
+
+#### `length(value)`
+Get string or array length:
+```ts
+length(user.name)     // String length
+length(user.tags)     // Array length
+```
+
+#### `concat(...values)`
+Concatenate strings:
+```ts
+concat(user.firstName, ' ', user.lastName)
+concat('User: ', user.name, ' (', user.id, ')')
+```
+
+### Mathematical Functions
+
+#### `add(left, right)`
+Add two numbers:
+```ts
+add(user.salary, user.bonus)
+```
+
+#### `coalesce(...values)`
+Return the first non-null value:
+```ts
+coalesce(user.displayName, user.name, 'Unknown')
+```
+
+### Aggregate Functions
+
+#### `count(value)`
+Count non-null values:
+```ts
+count(user.id)        // Count all users
+count(user.postId)    // Count users with posts
+```
+
+#### `sum(value)`
+Sum numeric values:
+```ts
+sum(order.amount)
+sum(user.salary)
+```
+
+#### `avg(value)`
+Calculate average:
+```ts
+avg(user.salary)
+avg(order.amount)
+```
+
+#### `min(value)`, `max(value)`
+Find minimum and maximum values:
+```ts
+min(user.salary)
+max(order.amount)
+```
+
+### Function Composition
+
+Functions can be composed and chained:
+
+```ts
+// Complex condition
+and(
+  eq(user.active, true),
+  or(
+    gt(user.age, 25),
+    eq(user.role, 'admin')
+  ),
+  not(inArray(user.id, bannedUserIds))
+)
+
+// Complex transformation
+concat(
+  upper(user.firstName),
+  ' ',
+  upper(user.lastName),
+  ' (',
+  user.id,
+  ')'
+)
+
+// Complex aggregation
+avg(add(user.salary, coalesce(user.bonus, 0)))
+```
+
+## Functional Variants
+
+The functional variant API provides an alternative to the standard API, offering more flexibility for complex transformations. With functional variants, the callback functions contain actual code that gets executed to perform the operation, giving you the full power of JavaScript at your disposal.
+
+> [!WARNING]
+> The functional variant API cannot be optimized by the query optimizer or use collection indexes. It is intended for use in rare cases where the standard API is not sufficient.
+
+### Functional Select
+
+Use `fn.select()` for complex transformations with JavaScript logic:
+
+```ts
+const userProfiles = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .fn.select((row) => ({
+      id: row.user.id,
+      displayName: `${row.user.firstName} ${row.user.lastName}`,
+      salaryTier: row.user.salary > 100000 ? 'senior' : 'junior',
+      emailDomain: row.user.email.split('@')[1],
+      isHighEarner: row.user.salary > 75000,
+    }))
+)
+```
+
+### Functional Where
+
+Use `fn.where()` for complex filtering logic:
+
+```ts
+const specialUsers = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .fn.where((row) => {
+      const user = row.user
+      return user.active && 
+             (user.age > 25 || user.role === 'admin') &&
+             user.email.includes('@company.com')
+    })
+)
+```
+
+### Functional Having
+
+Use `fn.having()` for complex aggregation filtering:
+
+```ts
+const highValueCustomers = createLiveQueryCollection((q) =>
+  q
+    .from({ order: ordersCollection })
+    .groupBy(({ order }) => order.customerId)
+    .select(({ order }) => ({
+      customerId: order.customerId,
+      totalSpent: sum(order.amount),
+      orderCount: count(order.id),
+    }))
+    .fn.having((row) => {
+      return row.totalSpent > 1000 && row.orderCount >= 3
+    })
+)
+```
+
+### Complex Transformations
+
+Functional variants excel at complex data transformations:
+
+```ts
+const userProfiles = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .fn.select((row) => {
+      const user = row.user
+      const fullName = `${user.firstName} ${user.lastName}`.trim()
+      const emailDomain = user.email.split('@')[1]
+      const ageGroup = user.age < 25 ? 'young' : user.age < 50 ? 'adult' : 'senior'
+      
+      return {
+        userId: user.id,
+        displayName: fullName || user.name,
+        contactInfo: {
+          email: user.email,
+          domain: emailDomain,
+          isCompanyEmail: emailDomain === 'company.com'
+        },
+        demographics: {
+          age: user.age,
+          ageGroup: ageGroup,
+          isAdult: user.age >= 18
+        },
+        status: user.active ? 'active' : 'inactive',
+        profileStrength: fullName && user.email && user.age ? 'complete' : 'incomplete'
+      }
+    })
+)
+```
+
+### Type Inference
+
+Functional variants maintain full TypeScript support:
+
+```ts
+const processedUsers = createLiveQueryCollection((q) =>
+  q
+    .from({ user: usersCollection })
+    .fn.select((row): ProcessedUser => ({
+      id: row.user.id,
+      name: row.user.name.toUpperCase(),
+      age: row.user.age,
+      ageGroup: row.user.age < 25 ? 'young' : row.user.age < 50 ? 'adult' : 'senior',
+    }))
+)
+```
+
+### When to Use Functional Variants
+
+Use functional variants when you need:
+- Complex JavaScript logic that can't be expressed with built-in functions
+- Integration with external libraries or utilities
+- Full JavaScript power for custom operations
+
+The callbacks in functional variants are actual JavaScript functions that get executed, unlike the standard API which uses declarative expressions. This gives you complete control over the logic but comes with the trade-off of reduced optimization opportunities.
+
+However, prefer the standard API when possible, as it provides better performance and optimization opportunities.
+
+
+---
+title: Error Handling
+id: error-handling
+---
+
+# Error Handling
+
+TanStack DB provides comprehensive error handling capabilities to ensure robust data synchronization and state management. This guide covers the built-in error handling mechanisms and how to work with them effectively.
+
+## Error Types
+
+TanStack DB provides named error classes for better error handling and type safety. All error classes can be imported from `@tanstack/db` (or more commonly, the framework-specific package e.g. `@tanstack/react-db`):
+
+```ts
+import {
+  SchemaValidationError,
+  CollectionInErrorStateError,
+  DuplicateKeyError,
+  MissingHandlerError,
+  TransactionError,
+  // ... and many more
+} from "@tanstack/db"
+```
+
+### SchemaValidationError
+
+Thrown when data doesn't match the collection's schema during insert or update operations:
+
+```ts
+import { SchemaValidationError } from "@tanstack/db"
+
+try {
+  todoCollection.insert({ text: 123 }) // Invalid type
+} catch (error) {
+  if (error instanceof SchemaValidationError) {
+    console.log(error.type) // 'insert' or 'update'
+    console.log(error.issues) // Array of validation issues
+    // Example issue: { message: "Expected string, received number", path: ["text"] }
+  }
+}
+```
+
+The error includes:
+- `type`: Whether it was an 'insert' or 'update' operation
+- `issues`: Array of validation issues with messages and paths
+- `message`: A formatted error message listing all issues
+
+## Collection Status and Error States
+
+Collections track their status and transition between states:
+
+```tsx
+import { useLiveQuery } from "@tanstack/react-db"
+
+const TodoList = () => {
+  const { data, status, isError, isLoading, isReady } = useLiveQuery(
+    (query) => query.from({ todos: todoCollection })
+  )
+
+  if (isError) {
+    return <div>Collection is in error state</div>
+  }
+
+  if (isLoading) {
+    return <div>Loading...</div>
+  }
+
+  return <div>{data?.map(todo => <div key={todo.id}>{todo.text}</div>)}</div>
+}
+```
+
+Collection status values:
+- `idle` - Not yet started
+- `loading` - Loading initial data
+- `initialCommit` - Processing initial data
+- `ready` - Ready for use
+- `error` - In error state
+- `cleaned-up` - Cleaned up and no longer usable
+
+## Transaction Error Handling
+
+When mutations fail, TanStack DB automatically rolls back optimistic updates:
+
+```ts
+const todoCollection = createCollection({
+  id: "todos",
+  onInsert: async ({ transaction }) => {
+    const response = await fetch("/api/todos", {
+      method: "POST",
+      body: JSON.stringify(transaction.mutations[0].modified),
+    })
+    
+    if (!response.ok) {
+      // Throwing an error will rollback the optimistic state
+      throw new Error(`HTTP Error: ${response.status}`)
+    }
+    
+    return response.json()
+  },
+})
+
+// Usage - optimistic update will be rolled back if the mutation fails
+try {
+  const tx = await todoCollection.insert({
+    id: "1",
+    text: "New todo",
+    completed: false,
+  })
+  
+  await tx.isPersisted.promise
+} catch (error) {
+  // The optimistic update has been automatically rolled back
+  console.error("Failed to create todo:", error)
+}
+```
+
+### Transaction States and Error Information
+
+Transactions have the following states:
+- `pending` - Transaction is being processed
+- `persisting` - Currently executing the mutation function
+- `completed` - Transaction completed successfully
+- `failed` - Transaction failed and was rolled back
+
+Access transaction error information from collection operations:
+
+```ts
+const todoCollection = createCollection({
+  id: "todos",
+  onUpdate: async ({ transaction }) => {
+    const response = await fetch(`/api/todos/${transaction.mutations[0].key}`, {
+      method: "PUT",
+      body: JSON.stringify(transaction.mutations[0].modified),
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Update failed: ${response.status}`)
+    }
+  },
+})
+
+try {
+  const tx = await todoCollection.update("todo-1", (draft) => {
+    draft.completed = true
+  })
+  
+  await tx.isPersisted.promise
+} catch (error) {
+  // Transaction has been rolled back
+  console.log(tx.state) // "failed"
+  console.log(tx.error) // { message: "Update failed: 500", error: Error }
+}
+```
+
+Or with manual transaction creation:
+
+```ts
+const tx = createTransaction({
+  mutationFn: async ({ transaction }) => {
+    throw new Error("API failed")
+  }
+})
+
+tx.mutate(() => {
+  collection.insert({ id: "1", text: "Item" })
+})
+
+try {
+  await tx.commit()
+} catch (error) {
+  // Transaction has been rolled back
+  console.log(tx.state) // "failed"
+  console.log(tx.error) // { message: "API failed", error: Error }
+}
+```
+
+## Collection Operation Errors
+
+### Invalid Collection State
+
+Collections in an `error` state cannot perform operations and must be manually recovered:
+
+```ts
+import { CollectionInErrorStateError } from "@tanstack/db"
+
+try {
+  todoCollection.insert(newTodo)
+} catch (error) {
+  if (error instanceof CollectionInErrorStateError) {
+    // Collection needs to be cleaned up and restarted
+    await todoCollection.cleanup()
+    
+    // Now retry the operation
+    todoCollection.insert(newTodo)
+  }
+}
+```
+
+### Missing Mutation Handlers
+
+Direct mutations require handlers to be configured:
+
+```ts
+const todoCollection = createCollection({
+  id: "todos",
+  getKey: (todo) => todo.id,
+  // Missing onInsert handler
+})
+
+// This will throw an error
+todoCollection.insert(newTodo)
+// Error: Collection.insert called directly (not within an explicit transaction) but no 'onInsert' handler is configured
+```
+
+### Duplicate Key Errors
+
+Inserting items with existing keys will throw:
+
+```ts
+import { DuplicateKeyError } from "@tanstack/db"
+
+try {
+  todoCollection.insert({ id: "existing-id", text: "Todo" })
+} catch (error) {
+  if (error instanceof DuplicateKeyError) {
+    console.log(`Duplicate key: ${error.message}`)
+  }
+}
+```
+
+### Schema Validation Errors
+
+Schema validation must be synchronous:
+
+```ts
+const todoCollection = createCollection({
+  id: "todos",
+  getKey: (todo) => todo.id,
+  schema: {
+    "~standard": {
+      validate: async (data) => { // Async validation not allowed
+        // ...
+      }
+    }
+  }
+})
+
+// Will throw: Schema validation must be synchronous
+```
+
+## Sync Error Handling
+
+### Query Collection Sync Errors
+
+Query collections handle sync errors gracefully and mark the collection as ready even on error to avoid blocking applications:
+
+```ts
+import { queryCollectionOptions } from "@tanstack/query-db-collection"
+
+const todoCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: ["todos"],
+    queryFn: async () => {
+      const response = await fetch("/api/todos")
+      if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.status}`)
+      }
+      return response.json()
+    },
+    queryClient,
+    getKey: (item) => item.id,
+    schema: todoSchema,
+    // Standard TanStack Query error handling options
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  })
+)
+```
+
+When sync errors occur:
+- Error is logged to console: `[QueryCollection] Error observing query...`
+- Collection is marked as ready to prevent blocking the application
+- Cached data remains available
+
+### Sync Write Errors
+
+Sync functions must handle their own errors during write operations:
+
+```ts
+const collection = createCollection({
+  id: "todos",
+  sync: {
+    sync: ({ begin, write, commit }) => {
+      begin()
+      
+      try {
+        // Will throw if key already exists
+        write({ type: "insert", value: { id: "existing-id", text: "Todo" } })
+      } catch (error) {
+        // Error: Cannot insert document with key "existing-id" from sync because it already exists
+      }
+      
+      commit()
+    }
+  }
+})
+```
+
+### Cleanup Error Handling
+
+Cleanup errors are isolated to prevent blocking the cleanup process:
+
+```ts
+const collection = createCollection({
+  id: "todos",
+  sync: {
+    sync: ({ begin, commit }) => {
+      begin()
+      commit()
+      
+      // Return a cleanup function
+      return () => {
+        // If this throws, the error is re-thrown in a microtask
+        // but cleanup continues successfully
+        throw new Error("Sync cleanup failed")
+      }
+    },
+  },
+})
+
+// Cleanup completes even if the sync cleanup function throws
+await collection.cleanup() // Resolves successfully
+// Error is re-thrown asynchronously via queueMicrotask
+```
+
+## Error Recovery Patterns
+
+### Collection Cleanup and Restart
+
+Clean up collections in error states:
+
+```ts
+if (todoCollection.status === "error") {
+  // Cleanup will stop sync and reset the collection
+  await todoCollection.cleanup()
+  
+  // Collection will automatically restart on next access
+  todoCollection.preload() // Or any other operation
+}
+```
+
+### Graceful Degradation
+
+Collections continue to work with cached data even when sync fails:
+
+```tsx
+const TodoApp = () => {
+  const { data, isError } = useLiveQuery((query) => 
+    query.from({ todos: todoCollection })
+  )
+
+  return (
+    <div>
+      {isError && (
+        <div>Sync failed, but you can still view cached data</div>
+      )}
+      {data?.map(todo => <TodoItem key={todo.id} todo={todo} />)}
+    </div>
+  )
+}
+```
+
+### Transaction Rollback Cascading
+
+When a transaction fails, conflicting transactions are automatically rolled back:
+
+```ts
+const tx1 = createTransaction({ mutationFn: async () => {} })
+const tx2 = createTransaction({ mutationFn: async () => {} })
+
+tx1.mutate(() => collection.update("1", draft => { draft.value = "A" }))
+tx2.mutate(() => collection.update("1", draft => { draft.value = "B" })) // Same item
+
+// Rolling back tx1 will also rollback tx2 due to conflict
+tx1.rollback() // tx2 is automatically rolled back
+```
+
+### Handling Invalid State Errors
+
+Transactions validate their state before operations:
+
+```ts
+const tx = createTransaction({ mutationFn: async () => {} })
+
+// Complete the transaction
+await tx.commit()
+
+// These will throw:
+tx.mutate(() => {}) // Error: You can no longer call .mutate() as the transaction is no longer pending
+tx.commit() // Error: You can no longer call .commit() as the transaction is no longer pending
+tx.rollback() // Error: You can no longer call .rollback() as the transaction is already completed
+```
+
+## Best Practices
+
+1. **Use instanceof checks** - Use `instanceof` instead of string matching for error handling:
+   ```ts
+   // ✅ Good - type-safe error handling
+   if (error instanceof SchemaValidationError) {
+     // Handle validation error
+   }
+   
+   // ❌ Avoid - brittle string matching  
+   if (error.message.includes("validation failed")) {
+     // Handle validation error
+   }
+   ```
+
+2. **Import specific error types** - Import only the error classes you need for better tree-shaking
+3. **Always handle SchemaValidationError** - Provide clear feedback for validation failures
+4. **Check collection status** - Use `isError`, `isLoading`, `isReady` flags in React components
+5. **Handle transaction promises** - Always handle `isPersisted.promise` rejections
+
+## Example: Complete Error Handling
+
+```tsx
+import { 
+  createCollection, 
+  SchemaValidationError,
+  DuplicateKeyError,
+  createTransaction
+} from "@tanstack/db"
+import { useLiveQuery } from "@tanstack/react-db"
+
+const todoCollection = createCollection({
+  id: "todos",
+  schema: todoSchema,
+  getKey: (todo) => todo.id,
+  onInsert: async ({ transaction }) => {
+    const response = await fetch("/api/todos", {
+      method: "POST",
+      body: JSON.stringify(transaction.mutations[0].modified),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    return response.json()
+  },
+  sync: {
+    sync: ({ begin, write, commit }) => {
+      // Your sync implementation
+      begin()
+      // ... sync logic
+      commit()
+    }
+  }
+})
+
+const TodoApp = () => {
+  const { data, status, isError, isLoading } = useLiveQuery(
+    (query) => query.from({ todos: todoCollection })
+  )
+
+  const handleAddTodo = async (text: string) => {
+    try {
+      const tx = await todoCollection.insert({
+        id: crypto.randomUUID(),
+        text,
+        completed: false,
+      })
+      
+      // Wait for persistence
+      await tx.isPersisted.promise
+    } catch (error) {
+      if (error instanceof SchemaValidationError) {
+        alert(`Validation error: ${error.issues[0]?.message}`)
+      } else if (error instanceof DuplicateKeyError) {
+        alert("A todo with this ID already exists")
+      } else {
+        alert(`Failed to add todo: ${error.message}`)
+      }
+    }
+  }
+
+  const handleCleanup = async () => {
+    try {
+      await todoCollection.cleanup()
+      // Collection will restart on next access
+    } catch (error) {
+      console.error("Cleanup failed:", error)
+    }
+  }
+
+  if (isError) {
+    return (
+      <div>
+        <div>Collection error - data may be stale</div>
+        <button onClick={handleCleanup}>
+          Restart Collection
+        </button>
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return <div>Loading todos...</div>
+  }
+
+  return (
+    <div>
+      <button onClick={() => handleAddTodo("New todo")}>
+        Add Todo
+      </button>
+      {data?.map(todo => (
+        <div key={todo.id}>{todo.text}</div>
+      ))}
+    </div>
+  )
+}
+```
+
+## See Also
+
+- [Mutations Guide](./overview.md#mutations) - Learn about optimistic updates and rollbacks
+- [API Reference](./overview.md#api-reference) - Detailed API documentation
+- [TanStack Query Error Handling](https://tanstack.com/query/latest/docs/react/guides/error-handling) - Query-specific error handling
+
+
+---
+title: Creating a Collection Options Creator
+id: guide/collection-options-creator
+---
+# Creating a Collection Options Creator
+
+A collection options creator is a factory function that generates configuration options for TanStack DB collections. It provides a standardized way to integrate different sync engines and data sources with TanStack DB's reactive sync-first architecture.
+
+## Overview
+
+Collection options creators follow a consistent pattern:
+1. Accept configuration specific to the sync engine
+2. Return an object that satisfies the `CollectionConfig` interface
+3. Handle sync initialization, data parsing, and transaction management
+4. Optionally provide utility functions specific to the sync engine
+
+## When to Create a Custom Collection
+
+You should create a custom collection when:
+- You have a dedicated sync engine (like ElectricSQL, Trailbase, or a custom WebSocket solution)
+- You need specific sync behaviors that aren't covered by the query collection
+- You want to integrate with a backend that has its own sync protocol
+
+**Note**: If you're just hitting an API and returning data, use the query collection instead.
+
+## Core Requirements
+
+Every collection options creator must implement these key responsibilities:
+
+### 1. Configuration Interface
+
+Define a configuration interface that extends or includes standard collection properties:
+
+```typescript
+// Pattern A: User provides handlers (Query / ElectricSQL style)
+interface MyCollectionConfig<TItem extends object> {
+  // Your sync engine specific options
+  connectionUrl: string
+  apiKey?: string
+  
+  // Standard collection properties
+  id?: string
+  schema?: StandardSchemaV1
+  getKey: (item: TItem) => string | number
+  sync?: SyncConfig<TItem>
+  
+  // User provides mutation handlers
+  onInsert?: InsertMutationFn<TItem>
+  onUpdate?: UpdateMutationFn<TItem>
+  onDelete?: DeleteMutationFn<TItem>
+}
+
+// Pattern B: Built-in handlers (Trailbase style)
+interface MyCollectionConfig<TItem extends object> 
+  extends Omit<CollectionConfig<TItem>, 'onInsert' | 'onUpdate' | 'onDelete'> {
+  // Your sync engine specific options
+  recordApi: MyRecordApi<TItem>
+  connectionUrl: string
+  
+  // Note: onInsert/onUpdate/onDelete are implemented by your collection creator
+}
+```
+
+### 2. Sync Implementation
+
+The sync function is the heart of your collection. It must:
+
+```typescript
+const sync: SyncConfig<T>['sync'] = (params) => {
+  const { begin, write, commit, markReady, collection } = params
+  
+  // 1. Initialize connection to your sync engine
+  const connection = initializeConnection(config)
+  
+  // 2. Perform initial data fetch
+  async function initialSync() {
+    const data = await fetchInitialData()
+    
+    begin() // Start a transaction
+    
+    for (const item of data) {
+      write({
+        type: 'insert',
+        value: item
+      })
+    }
+    
+    commit() // Commit the transaction
+    markReady() // Mark collection as ready
+  }
+
+  // 3. Subscribe to real-time updates
+  connection.subscribe((event) => {
+    begin()
+    
+    switch (event.type) {
+      case 'insert':
+        write({ type: 'insert', value: event.data })
+        break
+      case 'update':
+        write({ type: 'update', value: event.data })
+        break
+      case 'delete':
+        write({ type: 'delete', value: event.data })
+        break
+    }
+    
+    commit()
+  })
+  
+  initialSync()
+  
+  // 4. Return cleanup function
+  return () => {
+    connection.close()
+  }
+}
+```
+
+### 3. Transaction Lifecycle
+
+The sync process follows this lifecycle:
+
+1. **begin()** - Start collecting changes
+2. **write()** - Add changes to the pending transaction
+3. **commit()** - Apply all changes atomically
+4. **markReady()** - Signal that initial sync is complete
+
+**Important**: Many sync engines start real-time subscriptions before the initial sync completes. Your implementation may need to deduplicate events that arrive via subscription that represent the same data as the initial sync. Consider tracking timestamps, sequence numbers, or using other mechanisms to avoid processing the same change twice.
+
+### 4. Data Parsing and Type Conversion
+
+If your sync engine returns data with different types, provide conversion functions for specific fields:
+
+```typescript
+interface MyCollectionConfig<TItem, TRecord> {
+  // ... other config
+  
+  // Only specify conversions for fields that need type conversion
+  parse: {
+    created_at: (ts: number) => new Date(ts * 1000),  // timestamp -> Date
+    updated_at: (ts: number) => new Date(ts * 1000),  // timestamp -> Date
+    metadata?: (str: string) => JSON.parse(str)       // JSON string -> object
+  }
+  
+  serialize: {
+    created_at: (date: Date) => Math.floor(date.valueOf() / 1000),  // Date -> timestamp
+    updated_at: (date: Date) => Math.floor(date.valueOf() / 1000),  // Date -> timestamp  
+    metadata?: (obj: object) => JSON.stringify(obj)                 // object -> JSON string
+  }
+}
+```
+
+### 5. Mutation Handler Patterns
+
+There are two distinct patterns for handling mutations in collection options creators:
+
+#### Pattern A: User-Provided Handlers (ElectricSQL, Query)
+
+The user provides mutation handlers in the config. Your collection creator passes them through:
+
+```typescript
+interface MyCollectionConfig<TItem extends object> {
+  // ... other config
+  
+  // User provides these handlers
+  onInsert?: InsertMutationFn<TItem>
+  onUpdate?: UpdateMutationFn<TItem>
+  onDelete?: DeleteMutationFn<TItem>
+}
+
+export function myCollectionOptions<TItem extends object>(
+  config: MyCollectionConfig<TItem>
+) {
+  return {
+    // ... other options
+    
+    // Pass through user-provided handlers (possibly with additional logic)
+    onInsert: config.onInsert ? async (params) => {
+      const result = await config.onInsert!(params)
+      // Additional sync coordination logic
+      return result
+    } : undefined
+  }
+}
+```
+
+#### Pattern B: Built-in Handlers (Trailbase, WebSocket)
+
+Your collection creator implements the handlers directly using the sync engine's APIs:
+
+```typescript
+interface MyCollectionConfig<TItem extends object> 
+  extends Omit<CollectionConfig<TItem>, 'onInsert' | 'onUpdate' | 'onDelete'> {
+  // ... sync engine specific config
+  // Note: onInsert/onUpdate/onDelete are NOT in the config
+}
+
+export function myCollectionOptions<TItem extends object>(
+  config: MyCollectionConfig<TItem>
+) {
+  return {
+    // ... other options
+    
+    // Implement handlers using sync engine APIs
+    onInsert: async ({ transaction }) => {
+      const ids = await config.recordApi.createBulk(
+        transaction.mutations.map(m => serialize(m.modified))
+      )
+      await awaitIds(ids)
+      return ids
+    },
+    
+    onUpdate: async ({ transaction }) => {
+      await Promise.all(
+        transaction.mutations.map(m => 
+          config.recordApi.update(m.key, serialize(m.changes))
+        )
+      )
+      await awaitIds(transaction.mutations.map(m => String(m.key)))
+    }
+  }
+}
+```
+
+Choose Pattern A when users need to provide their own APIs, and Pattern B when your sync engine handles writes directly.
+
+## Complete Example: WebSocket Collection
+
+Here's a complete example of a WebSocket-based collection options creator that demonstrates the full round-trip flow:
+
+1. Client sends transaction with all mutations batched together
+2. Server processes the transaction and may modify the data (validation, timestamps, etc.)
+3. Server sends back acknowledgment and the actual processed data
+4. Client waits for this round-trip before dropping optimistic state
+
+```typescript
+import type {
+  CollectionConfig,
+  SyncConfig,
+  InsertMutationFnParams,
+  UpdateMutationFnParams,
+  DeleteMutationFnParams,
+  UtilsRecord
+} from '@tanstack/db'
+
+interface WebSocketMessage<T> {
+  type: 'insert' | 'update' | 'delete' | 'sync' | 'transaction' | 'ack'
+  data?: T | T[]
+  mutations?: Array<{
+    type: 'insert' | 'update' | 'delete'
+    data: T
+    id?: string
+  }>
+  transactionId?: string
+  id?: string
+}
+
+interface WebSocketCollectionConfig<TItem extends object>
+  extends Omit<CollectionConfig<TItem>, 'onInsert' | 'onUpdate' | 'onDelete' | 'sync'> {
+  url: string
+  reconnectInterval?: number
+  
+  // Note: onInsert/onUpdate/onDelete are handled by the WebSocket connection
+  // Users don't provide these handlers
+}
+
+interface WebSocketUtils extends UtilsRecord {
+  reconnect: () => void
+  getConnectionState: () => 'connected' | 'disconnected' | 'connecting'
+}
+
+export function webSocketCollectionOptions<TItem extends object>(
+  config: WebSocketCollectionConfig<TItem>
+): CollectionConfig<TItem> & { utils: WebSocketUtils } {
+  let ws: WebSocket | null = null
+  let reconnectTimer: NodeJS.Timeout | null = null
+  let connectionState: 'connected' | 'disconnected' | 'connecting' = 'disconnected'
+  
+  // Track pending transactions awaiting acknowledgment
+  const pendingTransactions = new Map<string, {
+    resolve: () => void
+    reject: (error: Error) => void
+    timeout: NodeJS.Timeout
+  }>()
+  
+  const sync: SyncConfig<TItem>['sync'] = (params) => {
+    const { begin, write, commit, markReady } = params
+    
+    function connect() {
+      connectionState = 'connecting'
+      ws = new WebSocket(config.url)
+      
+      ws.onopen = () => {
+        connectionState = 'connected'
+        // Request initial sync
+        ws.send(JSON.stringify({ type: 'sync' }))
+      }
+      
+      ws.onmessage = (event) => {
+        const message: WebSocketMessage<TItem> = JSON.parse(event.data)
+        
+        switch (message.type) {
+          case 'sync':
+            // Initial sync with array of items
+            begin()
+            if (Array.isArray(message.data)) {
+              for (const item of message.data) {
+                write({ type: 'insert', value: item })
+              }
+            }
+            commit()
+            markReady()
+            break
+            
+          case 'insert':
+          case 'update':
+          case 'delete':
+            // Real-time updates from other clients
+            begin()
+            write({ 
+              type: message.type, 
+              value: message.data as TItem 
+            })
+            commit()
+            break
+            
+          case 'ack':
+            // Server acknowledged our transaction
+            if (message.transactionId) {
+              const pending = pendingTransactions.get(message.transactionId)
+              if (pending) {
+                clearTimeout(pending.timeout)
+                pendingTransactions.delete(message.transactionId)
+                pending.resolve()
+              }
+            }
+            break
+            
+          case 'transaction':
+            // Server sending back the actual data after processing our transaction
+            if (message.mutations) {
+              begin()
+              for (const mutation of message.mutations) {
+                write({
+                  type: mutation.type,
+                  value: mutation.data
+                })
+              }
+              commit()
+            }
+            break
+        }
+      }
+      
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error)
+        connectionState = 'disconnected'
+      }
+      
+      ws.onclose = () => {
+        connectionState = 'disconnected'
+        // Auto-reconnect
+        if (!reconnectTimer) {
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = null
+            connect()
+          }, config.reconnectInterval || 5000)
+        }
+      }
+    }
+    
+    // Start connection
+    connect()
+    
+    // Return cleanup function
+    return () => {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer)
+        reconnectTimer = null
+      }
+      if (ws) {
+        ws.close()
+        ws = null
+      }
+    }
+  }
+  
+  // Helper function to send transaction and wait for server acknowledgment
+  const sendTransaction = async (
+    params: InsertMutationFnParams<TItem> | UpdateMutationFnParams<TItem> | DeleteMutationFnParams<TItem>
+  ): Promise<void> => {
+    if (ws?.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket not connected')
+    }
+    
+    const transactionId = crypto.randomUUID()
+    
+    // Convert all mutations in the transaction to the wire format
+    const mutations = params.transaction.mutations.map(mutation => ({
+      type: mutation.type,
+      id: mutation.key,
+      data: mutation.type === 'delete' ? undefined : 
+           mutation.type === 'update' ? mutation.changes : 
+           mutation.modified
+    }))
+    
+    // Send the entire transaction at once
+    ws.send(JSON.stringify({
+      type: 'transaction',
+      transactionId,
+      mutations
+    }))
+    
+    // Wait for server acknowledgment
+    return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        pendingTransactions.delete(transactionId)
+        reject(new Error(`Transaction ${transactionId} timed out`))
+      }, 10000) // 10 second timeout
+      
+      pendingTransactions.set(transactionId, {
+        resolve,
+        reject,
+        timeout
+      })
+    })
+  }
+  
+  // All mutation handlers use the same transaction sender
+  const onInsert = async (params: InsertMutationFnParams<TItem>) => {
+    await sendTransaction(params)
+  }
+  
+  const onUpdate = async (params: UpdateMutationFnParams<TItem>) => {
+    await sendTransaction(params)
+  }
+  
+  const onDelete = async (params: DeleteMutationFnParams<TItem>) => {
+    await sendTransaction(params)
+  }
+  
+  return {
+    id: config.id,
+    schema: config.schema,
+    getKey: config.getKey,
+    sync: { sync },
+    onInsert,
+    onUpdate,
+    onDelete,
+    utils: {
+      reconnect: () => {
+        if (ws) ws.close()
+        connect()
+      },
+      getConnectionState: () => connectionState
+    }
+  }
+}
+```
+
+## Usage Example
+
+```typescript
+import { createCollection } from '@tanstack/react-db'
+import { webSocketCollectionOptions } from './websocket-collection'
+
+const todos = createCollection(
+  webSocketCollectionOptions({
+    url: 'ws://localhost:8080/todos',
+    getKey: (todo) => todo.id,
+    schema: todoSchema
+    // Note: No onInsert/onUpdate/onDelete - handled by WebSocket automatically
+  })
+)
+
+// Use the collection
+todos.insert({ id: '1', text: 'Buy milk', completed: false })
+
+// Access utilities
+todos.utils.getConnectionState() // 'connected'
+todos.utils.reconnect() // Force reconnect
+```
+
+## Best Practices
+
+1. **Always call markReady()** - This signals that the collection has initial data and is ready for use
+2. **Handle errors gracefully** - Call markReady() even on error to avoid blocking the app
+3. **Clean up resources** - Return a cleanup function from sync to prevent memory leaks
+4. **Batch operations** - Use begin/commit to batch multiple changes for better performance
+5. **Type safety** - Use TypeScript generics to maintain type safety throughout
+6. **Provide utilities** - Export sync-engine-specific utilities for advanced use cases
+
+## Row Update Modes
+
+Collections support two update modes:
+
+- **`partial`** (default) - Updates are merged with existing data
+- **`full`** - Updates replace the entire row
+
+Configure this in your sync config:
+
+```typescript
+sync: {
+  sync: syncFn,
+  rowUpdateMode: 'full' // or 'partial'
+}
+```
+
+## Advanced: Managing Optimistic State
+
+A critical challenge in sync-first apps is knowing when to drop optimistic state. When a user makes a change:
+
+1. The UI updates immediately (optimistic update)
+2. A mutation is sent to the backend
+3. The backend processes and persists the change
+4. The change syncs back to the client
+5. The optimistic state should be dropped in favor of the synced data
+
+The key question is: **How do you know when step 4 is complete?**
+
+### Strategy 1: Transaction ID Tracking (ElectricSQL)
+
+ElectricSQL returns transaction IDs that you can track:
+
+```typescript
+// Track seen transaction IDs
+const seenTxids = new Store<Set<number>>(new Set())
+
+// In sync, track txids from incoming messages
+if (message.headers.txids) {
+  message.headers.txids.forEach(txid => {
+    seenTxids.setState(prev => new Set([...prev, txid]))
+  })
+}
+
+// Mutation handlers return txids and wait for them
+const wrappedOnInsert = async (params) => {
+  const result = await config.onInsert!(params)
+  
+  // Wait for the txid to appear in synced data
+  if (result.txid) {
+    await awaitTxId(result.txid)
+  }
+  
+  return result
+}
+
+// Utility function to wait for a txid
+const awaitTxId = (txId: number): Promise<boolean> => {
+  if (seenTxids.state.has(txId)) return Promise.resolve(true)
+  
+  return new Promise((resolve) => {
+    const unsubscribe = seenTxids.subscribe(() => {
+      if (seenTxids.state.has(txId)) {
+        unsubscribe()
+        resolve(true)
+      }
+    })
+  })
+}
+```
+
+### Strategy 2: ID-Based Tracking (Trailbase)
+
+Trailbase tracks when specific record IDs have been synced:
+
+```typescript
+// Track synced IDs with timestamps
+const seenIds = new Store(new Map<string, number>())
+
+// In sync, mark IDs as seen
+write({ type: 'insert', value: item })
+seenIds.setState(prev => new Map(prev).set(item.id, Date.now()))
+
+// Wait for specific IDs after mutations
+const wrappedOnInsert = async (params) => {
+  const ids = await config.recordApi.createBulk(items)
+  
+  // Wait for all IDs to be synced back
+  await awaitIds(ids)
+}
+
+const awaitIds = (ids: string[]): Promise<void> => {
+  const allSynced = ids.every(id => seenIds.state.has(id))
+  if (allSynced) return Promise.resolve()
+  
+  return new Promise((resolve) => {
+    const unsubscribe = seenIds.subscribe((state) => {
+      if (ids.every(id => state.has(id))) {
+        unsubscribe()
+        resolve()
+      }
+    })
+  })
+}
+```
+
+### Strategy 3: Full Refetch (Query Collection)
+
+The query collection simply refetches all data after mutations:
+
+```typescript
+const wrappedOnInsert = async (params) => {
+  // Perform the mutation
+  await config.onInsert(params)
+  
+  // Refetch the entire collection
+  await refetch()
+  
+  // The refetch will trigger sync with fresh data,
+  // automatically dropping optimistic state
+}
+```
+
+### Strategy 4: Version/Timestamp Tracking
+
+Track version numbers or timestamps to detect when data is fresh:
+
+```typescript
+// Track latest sync timestamp
+let lastSyncTime = 0
+
+// In mutations, record when the operation was sent
+const wrappedOnUpdate = async (params) => {
+  const mutationTime = Date.now()
+  await config.onUpdate(params)
+  
+  // Wait for sync to catch up
+  await waitForSync(mutationTime)
+}
+
+const waitForSync = (afterTime: number): Promise<void> => {
+  if (lastSyncTime > afterTime) return Promise.resolve()
+  
+  return new Promise((resolve) => {
+    const check = setInterval(() => {
+      if (lastSyncTime > afterTime) {
+        clearInterval(check)
+        resolve()
+      }
+    }, 100)
+  })
+}
+```
+
+### Choosing a Strategy
+
+- **Transaction IDs**: Best when your backend provides reliable transaction tracking
+- **ID-Based**: Good for systems where each mutation returns the affected IDs
+- **Full Refetch**: Simplest but least efficient; good for small datasets
+- **Version/Timestamp**: Works when your sync includes reliable ordering information
+
+### Implementation Tips
+
+1. **Always wait for sync** in your mutation handlers to ensure optimistic state is properly managed
+2. **Handle timeouts** - Don't wait forever for sync confirmation
+3. **Clean up tracking data** - Remove old txids/IDs to prevent memory leaks
+4. **Provide utilities** - Export functions like `awaitTxId` or `awaitSync` for advanced use cases
+
+## Testing Your Collection
+
+Test your collection options creator with:
+
+1. **Unit tests** - Test sync logic, data transformations
+2. **Integration tests** - Test with real sync engine
+3. **Error scenarios** - Connection failures, invalid data
+4. **Performance** - Large datasets, frequent updates
+
+## Conclusion
+
+Creating a collection options creator allows you to integrate any sync engine with TanStack DB's powerful sync-first architecture. Follow the patterns shown here, and you'll have a robust, type-safe integration that provides excellent developer experience.

@@ -6,9 +6,9 @@ import { TreeView, type TreeDataItem } from "@/components/file-tree"
 import { fileSystemNodeCollection, projectCollection } from "@/lib/collections"
 import {
   transformFileSystemNodesToTree,
-  createNewFileSystemNode,
   type FileTreeNode,
 } from "@/lib/file-tree-utils"
+import { useCreateFileWithNavigation } from "@/lib/use-create-file-with-navigation"
 import { useFileContext } from "@/lib/file-context"
 import { type FileSystemNode } from "@/db/schema"
 import { Button } from "@/components/ui/button"
@@ -29,6 +29,7 @@ interface ProjectFileTreeProps {
 
 export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
   const { selectedFileNode, setSelectedFileNode } = useFileContext()
+  const { createFile, isCreating } = useCreateFileWithNavigation()
   const [newItemDialog, setNewItemDialog] = useState<{
     open: boolean
     type: "file" | "directory"
@@ -118,32 +119,24 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     })
   }
 
-  const handleCreateItem = () => {
-    if (!newItemName.trim() || !project) return
+  const handleCreateItem = async () => {
+    if (!newItemName.trim() || !project || isCreating) return
 
-    const newNode = createNewFileSystemNode(
-      projectId,
-      newItemDialog.parentPath,
-      newItemName.trim(),
-      newItemDialog.type
-    )
+    try {
+      await createFile({
+        projectId,
+        parentPath: newItemDialog.parentPath,
+        name: newItemName.trim(),
+        type: newItemDialog.type,
+      })
 
-    fileSystemNodeCollection.insert({
-      id: Math.floor(Math.random() * 100000),
-      ...newNode,
-      userIds: [project.ownerId, ...project.sharedUserIds],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })
-
-    toast.success(
-      `${newItemDialog.type === "directory" ? "📁" : "📄"} ${
-        newItemDialog.type === "directory" ? "Folder" : "File"
-      } '${newItemName.trim()}' created`
-    )
-
-    setNewItemName("")
-    setNewItemDialog({ open: false, type: "file", parentPath: "/" })
+      // Close dialog and reset form
+      setNewItemName("")
+      setNewItemDialog({ open: false, type: "file", parentPath: "/" })
+    } catch (error) {
+      console.error("Error creating file:", error)
+      toast.error(`Failed to create ${newItemDialog.type}`)
+    }
   }
 
   const handleEdit = (node: FileSystemNode) => {
@@ -259,6 +252,7 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
                 setNewItemDialog({ open: true, type: "file", parentPath: "/" })
               }
               className="h-6 w-6 p-0"
+              disabled={isCreating}
             >
               <FilePlusIcon className="h-3 w-3" />
             </Button>
@@ -273,6 +267,7 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
                 })
               }
               className="h-6 w-6 p-0"
+              disabled={isCreating}
             >
               <FolderPlusIcon className="h-3 w-3" />
             </Button>
@@ -328,7 +323,9 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateItem}>Create</Button>
+            <Button onClick={handleCreateItem} disabled={isCreating}>
+              {isCreating ? "Creating..." : "Create"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -406,6 +403,7 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
                     setContextMenu({ open: false, x: 0, y: 0, node: null })
                   }}
                   className="flex items-center gap-2 w-full px-2 py-1.5 text-sm hover:bg-gray-100 rounded"
+                  disabled={isCreating}
                 >
                   <FilePlusIcon className="h-4 w-4" />
                   New File
@@ -420,6 +418,7 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
                     setContextMenu({ open: false, x: 0, y: 0, node: null })
                   }}
                   className="flex items-center gap-2 w-full px-2 py-1.5 text-sm hover:bg-gray-100 rounded"
+                  disabled={isCreating}
                 >
                   <FolderPlusIcon className="h-4 w-4" />
                   New Folder

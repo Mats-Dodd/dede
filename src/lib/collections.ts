@@ -173,12 +173,6 @@ export const fileSystemNodeCollection = createCollection(
     },
     onUpdate: async ({ transaction }) => {
       const { modified: updatedFileSystemNode } = transaction.mutations[0]
-      console.log("🔄 Collection onUpdate triggered:", {
-        id: updatedFileSystemNode.id,
-        title: updatedFileSystemNode.title,
-        name: updatedFileSystemNode.name,
-        updatedAt: updatedFileSystemNode.updatedAt,
-      })
       // @ts-expect-error - API types not properly generated yet
       const result = await client.api.fileSystemNodes[":id"].$put({
         param: { id: updatedFileSystemNode.id },
@@ -189,11 +183,6 @@ export const fileSystemNodeCollection = createCollection(
           path: updatedFileSystemNode.path,
           type: updatedFileSystemNode.type,
         },
-      })
-
-      console.log("🌐 API call result:", {
-        ok: result.ok,
-        status: result.status,
       })
 
       if (result.ok) {

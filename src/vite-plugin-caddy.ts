@@ -151,29 +151,9 @@ ${networkIP} {
         )
       }
 
-      // Override Vite's printUrls function
+      // Override Vite's printUrls function to suppress default output
       server.printUrls = function () {
-        // Get network IP
-        const nets = networkInterfaces()
-        let networkIP = "192.168.1.1" // fallback
-
-        for (const name of Object.keys(nets)) {
-          const netInterfaces = nets[name]
-          if (netInterfaces) {
-            for (const net of netInterfaces) {
-              if (net.family === "IPv4" && !net.internal) {
-                networkIP = net.address
-                break
-              }
-            }
-          }
-        }
-
-        console.log()
-        console.log(`  ➜  Local:   https://${projectName}.localhost/`)
-        console.log(`  ➜  Network: https://${networkIP}/`)
-        console.log(`  ➜  press h + enter to show help`)
-        console.log()
+        // Suppress default Vite URL output
       }
 
       server.middlewares.use((_req, _res, next) => {

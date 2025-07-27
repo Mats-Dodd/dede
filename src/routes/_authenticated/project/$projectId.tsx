@@ -29,29 +29,14 @@ function ProjectPage() {
 
   const handleTitleChange = useCallback(
     (title: string) => {
-      console.log("🏷️ Title change triggered:", {
-        title,
-        selectedFileNode: selectedFileNode?.fileSystemNode?.id,
-      })
       if (selectedFileNode?.fileSystemNode) {
-        console.log("📝 Updating title in collection:", {
-          id: selectedFileNode.fileSystemNode.id,
-          oldTitle: selectedFileNode.fileSystemNode.title,
-          newTitle: title,
-        })
         fileSystemNodeCollection.update(
           selectedFileNode.fileSystemNode.id.toString(),
           (draft) => {
             draft.title = title
             draft.updatedAt = new Date()
-            console.log("✅ Draft updated:", {
-              title: draft.title,
-              updatedAt: draft.updatedAt,
-            })
           }
         )
-      } else {
-        console.warn("❌ No selected file node for title update")
       }
     },
     [selectedFileNode]

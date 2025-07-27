@@ -165,7 +165,9 @@ export function createCRUDRoutes(config: CRUDConfig) {
         }
 
         const url = new URL(c.req.raw.url)
-        const originUrl = new URL(`http://localhost:3000/v1/shape`)
+        const originUrl = new URL(
+          `${process.env.ELECTRIC_URL || "http://localhost:3000"}/v1/shape`
+        )
 
         url.searchParams.forEach((value, key) => {
           if ([`live`, `table`, `handle`, `offset`, `cursor`].includes(key)) {

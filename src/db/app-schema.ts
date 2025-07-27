@@ -45,9 +45,8 @@ export const fileSystemNodes = pgTable("fileSystemNodes", {
     .references(() => projectsTable.id, { onDelete: "cascade" })
     .notNull(),
   path: varchar("path", { length: 1000 }).notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
   type: varchar("type", { length: 20 }).notNull(),
-  title: varchar("title", { length: 500 }),
+  title: varchar("title", { length: 500 }).notNull(),
   content: text("content"),
   metadata: jsonb("metadata")
     .$type<{

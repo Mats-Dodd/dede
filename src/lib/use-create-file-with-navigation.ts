@@ -59,7 +59,7 @@ export function useCreateFileWithNavigation(): CreateFileResult {
     // Look for a file that matches our creation criteria
     const matchingFiles = allFiles.filter(
       (file) =>
-        file.name === name &&
+        file.title === name &&
         file.path === path &&
         file.projectId === projectId &&
         file.type === type
@@ -81,7 +81,7 @@ export function useCreateFileWithNavigation(): CreateFileResult {
         // Re-fetch the file to make sure we have the latest version
         const latestFile = allFiles.find(
           (f) =>
-            f.name === name &&
+            f.title === name &&
             f.path === path &&
             f.projectId === projectId &&
             f.type === type
@@ -91,7 +91,7 @@ export function useCreateFileWithNavigation(): CreateFileResult {
           // Found our file! Select it and navigate
           const fileTreeNode: FileTreeNode = {
             id: latestFile.id.toString(),
-            name: latestFile.name,
+            name: latestFile.title,
             path: latestFile.path,
             type: latestFile.type as "file" | "directory",
             fileSystemNode: latestFile,

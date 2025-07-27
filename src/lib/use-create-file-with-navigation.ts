@@ -56,27 +56,7 @@ export function useCreateFileWithNavigation(): CreateFileResult {
     const { name, path, projectId, type, createdAfter } =
       creationTrackingRef.current
 
-    console.log("Checking for new file:", {
-      name,
-      path,
-      projectId,
-      type,
-      createdAfter,
-    })
-    console.log(
-      "All files:",
-      allFiles.map((f) => ({
-        id: f.id,
-        name: f.name,
-        path: f.path,
-        projectId: f.projectId,
-        type: f.type,
-        createdAt: f.createdAt,
-      }))
-    )
-
     // Look for a file that matches our creation criteria
-    // Let's be more lenient first and see what we can find
     const matchingFiles = allFiles.filter(
       (file) =>
         file.name === name &&
@@ -84,8 +64,6 @@ export function useCreateFileWithNavigation(): CreateFileResult {
         file.projectId === projectId &&
         file.type === type
     )
-
-    console.log("Matching files by name/path/project/type:", matchingFiles)
 
     // Try to find the most recently created matching file
     const newFile = matchingFiles
@@ -96,8 +74,6 @@ export function useCreateFileWithNavigation(): CreateFileResult {
         (a, b) =>
           new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()
       )[0]
-
-    console.log("Selected new file:", newFile)
 
     if (newFile && newFile.type === "file") {
       // Wait a bit to ensure ElectricSQL has fully processed the sync
@@ -110,8 +86,6 @@ export function useCreateFileWithNavigation(): CreateFileResult {
             f.projectId === projectId &&
             f.type === type
         )
-
-        console.log("Latest file found:", latestFile)
 
         if (latestFile) {
           // Found our file! Select it and navigate
@@ -200,7 +174,7 @@ export function useCreateFileWithNavigation(): CreateFileResult {
         )
 
         // Insert into collection with temporary ID
-        await fileSystemNodeCollection.insert({
+        fileSystemNodeCollection.insert({
           id: Math.floor(Math.random() * 100000), // Temporary ID
           ...newNode,
           userIds: [project.ownerId, ...project.sharedUserIds],

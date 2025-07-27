@@ -17,7 +17,7 @@ export default function TabManager() {
   const { goToNextTab, goToPreviousTab, goToTabByIndex, goToLastTab } =
     useTabNavigation()
 
-  // Mac-optimized keyboard shortcuts
+  // Mac-optimized keyboard shortcuts for tab navigation
   useMacKeyboardShortcuts([
     // Primary tab navigation with Cmd+Shift+Arrow keys
     {

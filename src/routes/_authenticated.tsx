@@ -8,6 +8,12 @@ import { SidebarInset, SidebarProvider } from "@/components/app-sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { FileProvider } from "@/lib/file-context"
 import Navbar from "@/components/navbar"
+import { CommandPalette } from "@/components/command-palette"
+import { useCommandPalette } from "@/lib/hooks/use-command-palette"
+import {
+  useMacKeyboardShortcuts,
+  createMacShortcut,
+} from "@/lib/hooks/use-mac-keyboard-shortcuts"
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -57,18 +63,38 @@ function AuthenticatedLayout() {
   return (
     <FileProvider>
       <SidebarProvider>
-        <div className="min-h-screen flex w-full bg-muted/30">
-          <AppSidebar />
-          <SidebarInset className="flex flex-col">
-            <Navbar />
-            <main className="flex-1 p-4">
-              <div className="floating-container-lg h-full">
-                <Outlet />
-              </div>
-            </main>
-          </SidebarInset>
-        </div>
+        <AuthenticatedContent />
       </SidebarProvider>
     </FileProvider>
+  )
+}
+
+function AuthenticatedContent() {
+  const { isOpen, openPalette, closePalette } = useCommandPalette()
+
+  // Global keyboard shortcuts
+  useMacKeyboardShortcuts([
+    // Command palette shortcut (Cmd+P)
+    {
+      ...createMacShortcut("p"),
+      handler: openPalette,
+    },
+  ])
+
+  return (
+    <>
+      <CommandPalette isOpen={isOpen} onClose={closePalette} />
+      <div className="min-h-screen flex w-full bg-muted/30">
+        <AppSidebar />
+        <SidebarInset className="flex flex-col">
+          <Navbar />
+          <main className="flex-1 p-4">
+            <div className="floating-container-lg h-full">
+              <Outlet />
+            </div>
+          </main>
+        </SidebarInset>
+      </div>
+    </>
   )
 }

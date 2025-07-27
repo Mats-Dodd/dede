@@ -169,6 +169,14 @@ export function createCRUDRoutes(config: CRUDConfig) {
           `${process.env.ELECTRIC_URL || "http://localhost:3000"}/v1/shape`
         )
 
+        // Add Electric Cloud auth parameters if configured
+        if (process.env.SOURCE_ID) {
+          originUrl.searchParams.set("source_id", process.env.SOURCE_ID)
+        }
+        if (process.env.SOURCE_SECRET) {
+          originUrl.searchParams.set("secret", process.env.SOURCE_SECRET)
+        }
+
         url.searchParams.forEach((value, key) => {
           if ([`live`, `table`, `handle`, `offset`, `cursor`].includes(key)) {
             originUrl.searchParams.set(key, value)

@@ -8,6 +8,36 @@ import { X } from "lucide-react"
 export default function TabManager() {
   const { openFiles, activeFileId, setActiveFile, closeFile } = useFileContext()
 
+  console.log(
+    "🎯 TabManager render - openFiles:",
+    openFiles.map((f) => ({
+      id: f.fileSystemNode.id.toString(),
+      title: f.fileSystemNode.title,
+    }))
+  )
+
+  // Deduplicate openFiles to prevent duplicate key errors
+  const deduplicatedOpenFiles = openFiles.filter(
+    (file, index, arr) =>
+      arr.findIndex(
+        (f) =>
+          f.fileSystemNode.id.toString() === file.fileSystemNode.id.toString()
+      ) === index
+  )
+
+  if (deduplicatedOpenFiles.length !== openFiles.length) {
+    console.log(
+      "🔴 Found duplicates! Original length:",
+      openFiles.length,
+      "Deduplicated length:",
+      deduplicatedOpenFiles.length
+    )
+    console.log(
+      "🔴 Duplicates found:",
+      openFiles.map((f) => f.fileSystemNode.id.toString())
+    )
+  }
+
   const handleContentChange = useCallback((content: string, fileId: string) => {
     fileSystemNodeCollection.update(fileId, (draft) => {
       draft.content = content
@@ -30,7 +60,7 @@ export default function TabManager() {
     [closeFile]
   )
 
-  if (openFiles.length === 0) {
+  if (deduplicatedOpenFiles.length === 0) {
     return (
       <div className="h-full flex items-center justify-center p-4">
         <div className="rounded-container text-center text-muted-foreground max-w-md">
@@ -54,7 +84,7 @@ export default function TabManager() {
         className="flex-1 flex flex-col"
       >
         <TabsList className="before:bg-border relative h-auto w-full gap-0.5 bg-transparent p-0 before:absolute before:inset-x-0 before:bottom-0 before:h-px justify-start">
-          {openFiles.map((file) => {
+          {deduplicatedOpenFiles.map((file) => {
             const fileId = file.fileSystemNode.id.toString()
             const fileName = file.fileSystemNode.title || "Untitled"
 
@@ -77,7 +107,7 @@ export default function TabManager() {
           })}
         </TabsList>
 
-        {openFiles.map((file) => {
+        {deduplicatedOpenFiles.map((file) => {
           const fileId = file.fileSystemNode.id.toString()
           const fileContent = file.fileSystemNode.content ?? undefined
           const fileTitle = file.fileSystemNode.title ?? undefined

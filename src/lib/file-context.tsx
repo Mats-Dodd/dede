@@ -24,39 +24,65 @@ export function FileProvider({ children }: { children: ReactNode }) {
     if (node.fileSystemNode.type !== "file") return
 
     const nodeId = node.fileSystemNode.id.toString()
+    console.log(
+      "🔵 openFile called for:",
+      nodeId,
+      "title:",
+      node.fileSystemNode.title
+    )
 
-    // Don't add if already open
-    if (openFiles.some((f) => f.fileSystemNode.id.toString() === nodeId)) {
+    setOpenFiles((prev) => {
+      console.log(
+        "🔵 Current openFiles before update:",
+        prev.map((f) => ({
+          id: f.fileSystemNode.id.toString(),
+          title: f.fileSystemNode.title,
+        }))
+      )
+
+      // Don't add if already open
+      if (prev.some((f) => f.fileSystemNode.id.toString() === nodeId)) {
+        console.log("🟡 File already open, just switching to it:", nodeId)
+        setActiveFileId(nodeId)
+        setSelectedFileNode(node)
+        return prev
+      }
+
+      // Add to open files and make it active
+      const newFiles = [...prev, node]
+      console.log(
+        "🟢 Adding new file. New openFiles:",
+        newFiles.map((f) => ({
+          id: f.fileSystemNode.id.toString(),
+          title: f.fileSystemNode.title,
+        }))
+      )
       setActiveFileId(nodeId)
       setSelectedFileNode(node)
-      return
-    }
-
-    // Add to open files and make it active
-    setOpenFiles((prev) => [...prev, node])
-    setActiveFileId(nodeId)
-    setSelectedFileNode(node)
+      return newFiles
+    })
   }
 
   const closeFile = (nodeId: string) => {
-    setOpenFiles((prev) =>
-      prev.filter((f) => f.fileSystemNode.id.toString() !== nodeId)
-    )
-
-    // If closing the active file, switch to another open file or clear selection
-    if (activeFileId === nodeId) {
-      const remainingFiles = openFiles.filter(
+    setOpenFiles((prev) => {
+      const filtered = prev.filter(
         (f) => f.fileSystemNode.id.toString() !== nodeId
       )
-      if (remainingFiles.length > 0) {
-        const nextFile = remainingFiles[remainingFiles.length - 1]
-        setActiveFileId(nextFile.fileSystemNode.id.toString())
-        setSelectedFileNode(nextFile)
-      } else {
-        setActiveFileId(undefined)
-        setSelectedFileNode(undefined)
+
+      // If closing the active file, switch to another open file or clear selection
+      if (activeFileId === nodeId) {
+        if (filtered.length > 0) {
+          const nextFile = filtered[filtered.length - 1]
+          setActiveFileId(nextFile.fileSystemNode.id.toString())
+          setSelectedFileNode(nextFile)
+        } else {
+          setActiveFileId(undefined)
+          setSelectedFileNode(undefined)
+        }
       }
-    }
+
+      return filtered
+    })
   }
 
   const setActiveFile = (nodeId: string) => {

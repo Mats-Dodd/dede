@@ -49,13 +49,8 @@ const Tiptap = ({
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTitle = e.target.value
-    console.log("🎯 Editor title input changed:", {
-      newTitle,
-      previousValue: titleValue,
-    })
     setTitleValue(newTitle)
     onTitleChange?.(newTitle)
-    console.log("📤 Title change callback called with:", newTitle)
   }
 
   return (

@@ -17,6 +17,7 @@ const config = defineConfig({
     caddyPlugin(),
     tailwindcss(),
     tanstackStart({
+      target: "vercel",
       spa: {
         enabled: true,
       },

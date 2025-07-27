@@ -21,6 +21,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { FolderPlusIcon, FilePlusIcon, TrashIcon, EditIcon } from "lucide-react"
+import { toast } from "sonner"
 
 interface ProjectFileTreeProps {
   projectId: number
@@ -132,6 +133,12 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
       updatedAt: new Date(),
     })
 
+    toast.success(
+      `${newItemDialog.type === "directory" ? "📁" : "📄"} ${
+        newItemDialog.type === "directory" ? "Folder" : "File"
+      } '${newItemName.trim()}' created`
+    )
+
     setNewItemName("")
     setNewItemDialog({ open: false, type: "file", parentPath: "/" })
   }
@@ -148,15 +155,17 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     if (!editDialog.node || !editForm.name.trim()) return
 
     const node = editDialog.node
+    const oldName = node.name
+    const newName = editForm.name.trim()
     const oldPath = node.path
     const newPath = node.path.replace(
       new RegExp(`/${node.name}$`),
-      `/${editForm.name.trim()}`
+      `/${newName}`
     )
 
     // Update the current node
     fileSystemNodeCollection.update(node.id.toString(), (draft) => {
-      draft.name = editForm.name.trim()
+      draft.name = newName
       draft.path = newPath
       draft.content = editForm.content.trim() || null
       draft.updatedAt = new Date()
@@ -177,11 +186,19 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
       })
     }
 
+    if (oldName !== newName) {
+      toast.success(`✏️ '${oldName}' renamed to '${newName}'`)
+    } else {
+      toast.success(`💾 '${newName}' updated`)
+    }
+
     setEditDialog({ open: false, node: null })
     setEditForm({ name: "", content: "" })
   }
 
   const handleDelete = (node: FileSystemNode) => {
+    const itemType = node.type === "directory" ? "Folder" : "File"
+
     // If this is a directory, delete all child nodes first
     if (node.type === "directory") {
       const childNodes = fileSystemNodes.filter((child) =>
@@ -195,6 +212,8 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
 
     // Delete the node itself
     fileSystemNodeCollection.delete(node.id.toString())
+
+    toast.success(`🗑️ ${itemType} '${node.name}' deleted`)
   }
 
   const treeDataWithContextMenu: TreeDataItem[] = useMemo(() => {

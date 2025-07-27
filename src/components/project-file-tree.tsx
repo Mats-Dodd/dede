@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import React, { useState, useMemo } from "react"
 import { useLiveQuery, eq } from "@tanstack/react-db"
 import { TreeView, type TreeDataItem } from "@/components/file-tree"
 import { fileSystemNodeCollection, projectCollection } from "@/lib/collections"
@@ -46,7 +46,7 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     node: FileTreeNode | null
   }>({ open: false, x: 0, y: 0, node: null })
 
-  const { data: fileSystemNodes = [] } = useLiveQuery(
+  const { data: rawFileSystemNodes = [] } = useLiveQuery(
     (q) =>
       q
         .from({ fileSystemNodeCollection })
@@ -55,6 +55,22 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
         ),
     [projectId]
   )
+
+  // Filter out phantom records with invalid data
+  const fileSystemNodes = React.useMemo(() => {
+    return rawFileSystemNodes.filter((node) => {
+      // Filter out phantom records that have invalid name/path combinations
+      const isPhantomRecord =
+        (node.name === "name" && node.path === "file") ||
+        // Also filter out any records with empty/invalid names or paths
+        !node.name ||
+        !node.path ||
+        node.name.trim() === "" ||
+        node.path.trim() === ""
+
+      return !isPhantomRecord
+    })
+  }, [rawFileSystemNodes])
   const { data: projects = [] } = useLiveQuery(
     (q) =>
       q

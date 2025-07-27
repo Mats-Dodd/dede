@@ -27,11 +27,47 @@ function ProjectPage() {
     [selectedFileNode]
   )
 
+  const handleTitleChange = useCallback(
+    (title: string) => {
+      console.log("🏷️ Title change triggered:", {
+        title,
+        selectedFileNode: selectedFileNode?.fileSystemNode?.id,
+      })
+      if (selectedFileNode?.fileSystemNode) {
+        console.log("📝 Updating title in collection:", {
+          id: selectedFileNode.fileSystemNode.id,
+          oldTitle: selectedFileNode.fileSystemNode.title,
+          newTitle: title,
+        })
+        fileSystemNodeCollection.update(
+          selectedFileNode.fileSystemNode.id.toString(),
+          (draft) => {
+            draft.title = title
+            draft.updatedAt = new Date()
+            console.log("✅ Draft updated:", {
+              title: draft.title,
+              updatedAt: draft.updatedAt,
+            })
+          }
+        )
+      } else {
+        console.warn("❌ No selected file node for title update")
+      }
+    },
+    [selectedFileNode]
+  )
+
   const fileContent = selectedFileNode?.fileSystemNode?.content ?? undefined
+  const fileTitle = selectedFileNode?.fileSystemNode?.title ?? undefined
 
   return (
     <div className="h-full">
-      <Tiptap content={fileContent} onContentChange={handleContentChange} />
+      <Tiptap
+        title={fileTitle}
+        content={fileContent}
+        onTitleChange={handleTitleChange}
+        onContentChange={handleContentChange}
+      />
     </div>
   )
 }

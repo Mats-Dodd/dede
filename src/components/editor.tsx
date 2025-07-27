@@ -54,23 +54,21 @@ const Tiptap = ({
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1 flex justify-center px-4 py-8">
-        <div className="w-full max-w-2xl">
-          <input
-            type="text"
-            value={titleValue}
-            onChange={handleTitleChange}
-            placeholder="Untitled"
-            className="w-full text-3xl font-bold border-none outline-none bg-transparent mb-6 placeholder-gray-400 resize-none"
-            style={{ fontFamily: "inherit" }}
+    <div className="h-full flex justify-center py-12">
+      <div className="w-full max-w-2xl h-full flex flex-col">
+        <input
+          type="text"
+          value={titleValue}
+          onChange={handleTitleChange}
+          placeholder="Untitled"
+          className="w-full text-4xl font-bold border-none outline-none bg-transparent mb-12 placeholder-gray-400 resize-none leading-tight"
+          style={{ fontFamily: "inherit" }}
+        />
+        <div className="flex-1 prose prose-xl max-w-none prose-headings:border-none prose-p:border-none prose-p:leading-relaxed prose-headings:leading-tight [&_.ProseMirror]:border-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:leading-relaxed">
+          <EditorContent
+            editor={editor}
+            className="h-full [&_.ProseMirror]:border-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:shadow-none [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:p-0 [&_.ProseMirror]:h-full [&_.ProseMirror]:text-lg [&_.ProseMirror]:leading-relaxed [&_.ProseMirror_p]:mb-6"
           />
-          <div className="prose prose-lg max-w-none prose-headings:border-none prose-p:border-none [&_.ProseMirror]:border-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:bg-transparent">
-            <EditorContent
-              editor={editor}
-              className="min-h-96 [&_.ProseMirror]:border-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:shadow-none [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:p-0"
-            />
-          </div>
         </div>
       </div>
     </div>

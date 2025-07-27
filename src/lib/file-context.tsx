@@ -26,7 +26,24 @@ export function FileProvider({ children }: { children: ReactNode }) {
     const nodeId = node.fileSystemNode.id.toString()
 
     setOpenFiles((prev) => {
-      // Don't add if already open
+      // Check for existing file with same path and title (handles temp ID vs real ID case)
+      const existingIndex = prev.findIndex(
+        (f) =>
+          f.fileSystemNode.path === node.fileSystemNode.path &&
+          f.fileSystemNode.title === node.fileSystemNode.title
+      )
+
+      if (existingIndex >= 0) {
+        // Replace existing file, preserving tab position
+        const newFiles = [...prev]
+        newFiles[existingIndex] = node
+
+        setActiveFileId(nodeId)
+        setSelectedFileNode(node)
+        return newFiles
+      }
+
+      // Don't add if already open by ID (fallback check)
       if (prev.some((f) => f.fileSystemNode.id.toString() === nodeId)) {
         setActiveFileId(nodeId)
         setSelectedFileNode(node)

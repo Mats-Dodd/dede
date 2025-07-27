@@ -83,25 +83,24 @@ export default function TabManager() {
         onValueChange={setActiveFile}
         className="flex-1 flex flex-col"
       >
-        <TabsList className="before:bg-border relative h-auto w-full gap-0.5 bg-transparent p-0 before:absolute before:inset-x-0 before:bottom-0 before:h-px justify-start">
+        <TabsList className="shrink-0">
           {deduplicatedOpenFiles.map((file) => {
             const fileId = file.fileSystemNode.id.toString()
             const fileName = file.fileSystemNode.title || "Untitled"
 
             return (
               <div key={`tab-${fileId}`} className="relative group">
-                <TabsTrigger
-                  value={fileId}
-                  className="bg-muted overflow-hidden rounded-b-none border-x border-t py-2 data-[state=active]:z-10 data-[state=active]:shadow-none pr-8"
-                >
-                  <span className="truncate max-w-32">{fileName}</span>
+                <TabsTrigger value={fileId} className="pr-8 max-w-48">
+                  <span className="truncate">{fileName}</span>
                 </TabsTrigger>
-                <div
+                <button
                   onClick={(e) => handleCloseTab(fileId, e)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 hover:bg-muted-foreground/20 rounded p-0.5 transition-opacity cursor-pointer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-data-[state=active]:opacity-100 hover:bg-muted rounded-sm p-0.5 transition-all duration-200 cursor-pointer z-10"
+                  type="button"
+                  aria-label={`Close ${fileName}`}
                 >
                   <X className="h-3 w-3" />
-                </div>
+                </button>
               </div>
             )
           })}
@@ -116,7 +115,7 @@ export default function TabManager() {
             <TabsContent
               key={`content-${fileId}`}
               value={fileId}
-              className="flex-1 mt-0"
+              className="flex-1 mt-0 border-0"
             >
               <Tiptap
                 title={fileTitle}

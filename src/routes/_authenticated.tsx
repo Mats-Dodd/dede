@@ -57,12 +57,14 @@ function AuthenticatedLayout() {
   return (
     <FileProvider>
       <SidebarProvider>
-        <div className="min-h-screen flex w-full">
+        <div className="min-h-screen flex w-full bg-muted/30">
           <AppSidebar />
-          <SidebarInset>
+          <SidebarInset className="flex flex-col">
             <Navbar />
             <main className="flex-1 p-4">
-              <Outlet />
+              <div className="floating-container-lg h-full">
+                <Outlet />
+              </div>
             </main>
           </SidebarInset>
         </div>

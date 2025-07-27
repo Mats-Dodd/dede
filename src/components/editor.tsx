@@ -1,5 +1,4 @@
 import { useEditor, EditorContent } from "@tiptap/react"
-import { FloatingMenu, BubbleMenu } from "@tiptap/react/menus"
 import StarterKit from "@tiptap/starter-kit"
 import { useEffect, useState } from "react"
 
@@ -71,21 +70,14 @@ const Tiptap = ({
             className="w-full text-3xl font-bold border-none outline-none bg-transparent mb-6 placeholder-gray-400 resize-none"
             style={{ fontFamily: "inherit" }}
           />
-          <div className="prose prose-lg max-w-none">
-            <EditorContent editor={editor} className="min-h-96" />
+          <div className="prose prose-lg max-w-none prose-headings:border-none prose-p:border-none [&_.ProseMirror]:border-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:bg-transparent">
+            <EditorContent
+              editor={editor}
+              className="min-h-96 [&_.ProseMirror]:border-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:shadow-none [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:p-0"
+            />
           </div>
         </div>
       </div>
-      <FloatingMenu editor={editor}>
-        <div className="bg-white border rounded-lg shadow-lg p-2 text-sm">
-          This is the floating menu
-        </div>
-      </FloatingMenu>
-      <BubbleMenu editor={editor}>
-        <div className="bg-white border rounded-lg shadow-lg p-2 text-sm">
-          This is the bubble menu
-        </div>
-      </BubbleMenu>
     </div>
   )
 }

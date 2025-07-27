@@ -88,7 +88,10 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
   const handleNodeSelect = (item: TreeDataItem | undefined) => {
     if (item && "fileSystemNode" in item) {
       const fileNode = item as FileTreeNode
-      setSelectedFileNode(fileNode)
+      // Only set selectedFileNode for actual files, not directories
+      if (fileNode.type === "file") {
+        setSelectedFileNode(fileNode)
+      }
     } else {
       setSelectedFileNode(undefined)
     }

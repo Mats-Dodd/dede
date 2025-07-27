@@ -85,6 +85,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
   const handleSelect = (file: CommandPaletteFile) => {
     selectFile(file)
+    onClose() // Ensure the dialog closes after selection
   }
 
   const renderFileItem = (file: CommandPaletteFile) => {

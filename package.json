@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite dev",
     "start": "node .output/server/index.mjs",
-    "build": "vite build",
+    "build": "npm run db:migrate && vite build",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:setup": "npm run db:generate && npm run db:migrate",

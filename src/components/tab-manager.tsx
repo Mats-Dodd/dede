@@ -4,9 +4,41 @@ import Tiptap from "@/components/editor"
 import { useCallback } from "react"
 import { fileSystemNodeCollection } from "@/lib/collections"
 import { X } from "lucide-react"
+import {
+  useMacKeyboardShortcuts,
+  createMacShortcut,
+} from "@/lib/hooks/use-mac-keyboard-shortcuts"
+import { useTabNavigation } from "@/lib/hooks/use-tab-navigation"
 
 export default function TabManager() {
   const { openFiles, activeFileId, setActiveFile, closeFile } = useFileContext()
+
+  // Tab navigation actions
+  const { goToNextTab, goToPreviousTab, goToTabByIndex, goToLastTab } =
+    useTabNavigation()
+
+  // Mac-optimized keyboard shortcuts
+  useMacKeyboardShortcuts([
+    // Primary tab navigation with Cmd+Shift+Arrow keys
+    {
+      ...createMacShortcut("ArrowRight", { shiftKey: true }),
+      handler: goToNextTab,
+    },
+    {
+      ...createMacShortcut("ArrowLeft", { shiftKey: true }),
+      handler: goToPreviousTab,
+    },
+    // Jump to tab by number (Cmd+1 through Cmd+9)
+    ...Array.from({ length: 9 }, (_, i) => ({
+      ...createMacShortcut((i + 1).toString()),
+      handler: () => goToTabByIndex(i + 1),
+    })),
+    // Jump to last tab (Cmd+0)
+    {
+      ...createMacShortcut("0"),
+      handler: goToLastTab,
+    },
+  ])
 
   // Deduplicate openFiles to prevent duplicate key errors
   const deduplicatedOpenFiles = openFiles.filter(

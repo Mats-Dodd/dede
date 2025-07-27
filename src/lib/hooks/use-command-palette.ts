@@ -17,21 +17,31 @@ export function useCommandPalette() {
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const { openFile, openFiles } = useFileContext()
-  const { projectId } = useParams({
-    from: "/_authenticated/project/$projectId",
-  })
+  // Retrieve the `projectId` param when the project route is active. When the
+  // user is on another child route (eg. the index redirect) there will be no
+  // active match for that route. Passing `strict: false` prevents TanStack
+  // Router from throwing an invariant error in that situation while still
+  // giving us typed access to the param when it *is* available.
+  const params = useParams({ strict: false }) as { projectId?: string }
+  const projectId = params?.projectId
+  const numericProjectId: number | undefined =
+    projectId !== undefined ? Number(projectId) : undefined
 
   // Get all files for the current project
   const { data: allFiles = [] } = useLiveQuery((q) =>
-    q
-      .from({ file: fileSystemNodeCollection })
-      .where(({ file }) =>
-        and(
-          eq(file.projectId, parseInt(projectId)),
-          eq(file.type, "file"),
-          eq(file.isDeleted, false)
-        )
+    q.from({ file: fileSystemNodeCollection }).where(({ file }) =>
+      and(
+        // If `projectId` is not defined yet, this query will effectively
+        // return an empty result set until the user selects/navigates to a
+        // project. When it *is* defined we cast to number for the query.
+        eq(
+          file.projectId,
+          numericProjectId !== undefined ? numericProjectId : -1
+        ),
+        eq(file.type, "file"),
+        eq(file.isDeleted, false)
       )
+    )
   )
 
   // Get recently opened file IDs

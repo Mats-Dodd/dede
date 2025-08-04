@@ -5,7 +5,7 @@ import { fileSystemNodeCollection, projectCollection } from "@/lib/collections"
 import {
   createNewFileSystemNode,
   type FileTreeNode,
-} from "@/lib/file-tree-utils"
+} from "@/lib/utils/file-tree-utils"
 import { useFileContext } from "@/lib/file-context"
 import { authClient } from "@/lib/auth-client"
 import { toast } from "sonner"

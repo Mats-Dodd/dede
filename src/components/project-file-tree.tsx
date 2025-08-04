@@ -7,7 +7,7 @@ import { fileSystemNodeCollection, projectCollection } from "@/lib/collections"
 import {
   transformFileSystemNodesToTree,
   type FileTreeNode,
-} from "@/lib/file-tree-utils"
+} from "@/lib/utils/file-tree-utils"
 import { useCreateFileWithNavigation } from "@/lib/use-create-file-with-navigation"
 import { useFileContext } from "@/lib/file-context"
 import { type FileSystemNode } from "@/db/schema"
@@ -21,7 +21,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { FolderPlusIcon, FilePlusIcon, TrashIcon, EditIcon } from "lucide-react"
-import { joinPaths, updateNodePath, updateChildPaths } from "@/lib/path-utils"
+import {
+  joinPaths,
+  updateNodePath,
+  updateChildPaths,
+} from "@/lib/utils/path-utils"
 import { toast } from "sonner"
 
 interface ProjectFileTreeProps {

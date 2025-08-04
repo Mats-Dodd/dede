@@ -1,8 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useFileContext } from "@/lib/file-context"
-import Tiptap from "@/components/editor"
+import FileEditorPane from "@/components/file-editor-pane"
 import { useCallback } from "react"
-import { fileSystemNodeCollection } from "@/lib/collections"
 import { X } from "lucide-react"
 import {
   useMacKeyboardShortcuts,
@@ -48,20 +47,6 @@ export default function TabManager() {
           f.fileSystemNode.id.toString() === file.fileSystemNode.id.toString()
       ) === index
   )
-
-  const handleContentChange = useCallback((content: string, fileId: string) => {
-    fileSystemNodeCollection.update(fileId, (draft) => {
-      draft.content = content
-      draft.updatedAt = new Date()
-    })
-  }, [])
-
-  const handleTitleChange = useCallback((title: string, fileId: string) => {
-    fileSystemNodeCollection.update(fileId, (draft) => {
-      draft.title = title
-      draft.updatedAt = new Date()
-    })
-  }, [])
 
   const handleCloseTab = useCallback(
     (fileId: string, e: React.MouseEvent) => {
@@ -119,8 +104,6 @@ export default function TabManager() {
 
         {deduplicatedOpenFiles.map((file) => {
           const fileId = file.fileSystemNode.id.toString()
-          const fileContent = file.fileSystemNode.content ?? undefined
-          const fileTitle = file.fileSystemNode.title ?? undefined
 
           return (
             <TabsContent
@@ -128,14 +111,7 @@ export default function TabManager() {
               value={fileId}
               className="flex-1 mt-0 border-0"
             >
-              <Tiptap
-                title={fileTitle}
-                content={fileContent}
-                onTitleChange={(title) => handleTitleChange(title, fileId)}
-                onContentChange={(content) =>
-                  handleContentChange(content, fileId)
-                }
-              />
+              <FileEditorPane fileId={fileId} />
             </TabsContent>
           )
         })}

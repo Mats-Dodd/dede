@@ -1,48 +1,68 @@
 import { useEditor, EditorContent } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
+import { fileSystemNodeCollection } from "@/lib/collections"
+
+function debounce<Args extends unknown[]>(
+  fn: (...args: Args) => void,
+  delay = 400
+): (...args: Args) => void {
+  let t: ReturnType<typeof setTimeout>
+  return (...args: Args) => {
+    clearTimeout(t)
+    t = setTimeout(() => fn(...args), delay)
+  }
+}
 
 const extensions = [StarterKit]
 
 interface TiptapProps {
+  fileId: string
   title?: string
   content?: string
-  onTitleChange?: (title: string) => void
-  onContentChange?: (content: string) => void
 }
 
-const Tiptap = ({
-  title,
-  content,
-  onTitleChange,
-  onContentChange,
-}: TiptapProps) => {
+const Tiptap = ({ fileId, title, content }: TiptapProps) => {
+  const lastSyncedHtml = useRef<string>(content ?? "")
   const [titleValue, setTitleValue] = useState(title || "")
 
-  // Use the content if provided, otherwise show default message
-  // Handle null, undefined, and empty string cases
   const editorContent =
     content !== null && content !== undefined && content !== ""
       ? content
       : "<p>Start typing to add content...</p>"
+
+  const updateTitleImmediate = (t: string) => {
+    fileSystemNodeCollection.update(fileId, (draft) => {
+      draft.title = t
+      draft.updatedAt = new Date()
+    })
+  }
+  const debouncedUpdateTitle = useRef(
+    debounce(updateTitleImmediate, 300)
+  ).current
 
   const editor = useEditor({
     extensions,
     content: editorContent,
     onUpdate: ({ editor }) => {
       const html = editor.getHTML()
-      onContentChange?.(html)
+      if (html === lastSyncedHtml.current) return
+      lastSyncedHtml.current = html
+      // optimistic local update if the content has changed
+      fileSystemNodeCollection.update(fileId, (draft) => {
+        draft.content = html
+        draft.updatedAt = new Date()
+      })
     },
   })
 
-  // Update editor content when prop changes
   useEffect(() => {
     if (editor && editorContent !== editor.getHTML()) {
+      lastSyncedHtml.current = editorContent
       editor.commands.setContent(editorContent)
     }
   }, [content, editorContent, editor])
 
-  // Update title when prop changes
   useEffect(() => {
     setTitleValue(title || "")
   }, [title])
@@ -50,7 +70,7 @@ const Tiptap = ({
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTitle = e.target.value
     setTitleValue(newTitle)
-    onTitleChange?.(newTitle)
+    debouncedUpdateTitle(newTitle)
   }
 
   return (

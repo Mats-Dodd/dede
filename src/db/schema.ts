@@ -9,7 +9,7 @@ const { createInsertSchema, createSelectSchema, createUpdateSchema } =
 export const selectProjectSchema = createSelectSchema(projectsTable)
 export const createProjectSchema = createInsertSchema(projectsTable)
   .omit({
-    created_at: true,
+    createdAt: true,
   })
   .openapi(`CreateProject`)
 export const updateProjectSchema = createUpdateSchema(projectsTable)
@@ -17,7 +17,7 @@ export const updateProjectSchema = createUpdateSchema(projectsTable)
 export const selectTodoSchema = createSelectSchema(todosTable)
 export const createTodoSchema = createInsertSchema(todosTable)
   .omit({
-    created_at: true,
+    createdAt: true,
   })
   .openapi(`CreateTodo`)
 export const updateTodoSchema = createUpdateSchema(todosTable)
@@ -25,7 +25,7 @@ export const updateTodoSchema = createUpdateSchema(todosTable)
 export const selectFileSystemNodeSchema = createSelectSchema(fileSystemNodes)
 export const createFileSystemNodeSchema = createInsertSchema(fileSystemNodes)
   .omit({
-    created_at: true,
+    createdAt: true,
   })
   .openapi(`CreateFileSystemNode`)
 export const updateFileSystemNodeSchema = createUpdateSchema(fileSystemNodes)

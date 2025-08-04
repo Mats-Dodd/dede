@@ -88,7 +88,7 @@ function AuthenticatedContent() {
         <AppSidebar />
         <SidebarInset className="flex flex-col">
           <Navbar />
-          <main className="flex-1 p-4">
+          <main className="flex-1 px-4 pb-4">
             <div className="floating-container-lg h-full">
               <Outlet />
             </div>

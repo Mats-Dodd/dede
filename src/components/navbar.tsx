@@ -45,15 +45,15 @@ export default function Navbar() {
 
   return (
     <header className="px-4 md:px-6">
-      <div className="flex h-14 items-center justify-between gap-4">
+      <div className="flex h-10 items-center justify-between gap-3">
         {/* Left side */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* Sidebar trigger */}
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleSidebar}
-            className="size-7"
+            className="size-6"
           >
             <PanelLeftIcon />
             <span className="sr-only">Toggle Sidebar</span>

@@ -1,6 +1,6 @@
 import { useEditor, EditorContent } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 
 const extensions = [StarterKit]
 
@@ -17,10 +17,9 @@ const Tiptap = ({
   onTitleChange,
   onContentChange,
 }: TiptapProps) => {
+  const lastSyncedHtml = useRef<string>(content ?? "")
   const [titleValue, setTitleValue] = useState(title || "")
 
-  // Use the content if provided, otherwise show default message
-  // Handle null, undefined, and empty string cases
   const editorContent =
     content !== null && content !== undefined && content !== ""
       ? content
@@ -31,18 +30,19 @@ const Tiptap = ({
     content: editorContent,
     onUpdate: ({ editor }) => {
       const html = editor.getHTML()
+      if (html === lastSyncedHtml.current) return
+      lastSyncedHtml.current = html
       onContentChange?.(html)
     },
   })
 
-  // Update editor content when prop changes
   useEffect(() => {
     if (editor && editorContent !== editor.getHTML()) {
+      lastSyncedHtml.current = editorContent
       editor.commands.setContent(editorContent)
     }
   }, [content, editorContent, editor])
 
-  // Update title when prop changes
   useEffect(() => {
     setTitleValue(title || "")
   }, [title])

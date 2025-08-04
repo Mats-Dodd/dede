@@ -1,26 +1,25 @@
-import { useLiveQuery, eq } from "@tanstack/react-db"
-import { fileSystemNodeCollection } from "@/lib/collections"
+import { useFileNode } from "@/lib/hooks/use-file-node"
 import Tiptap from "@/components/editor"
+import { TabsContent } from "@/components/ui/tabs"
 
-/**
- * Simple wrapper that subscribes to a single fileSystemNode row and renders
- * the Tiptap editor wired up for live updates.
- */
-export default function FileEditorPane({ fileId }: { fileId: string }) {
-  const { data } = useLiveQuery((q) =>
-    q
-      .from({ n: fileSystemNodeCollection })
-      .where(({ n }) => eq(n.id, Number(fileId)))
-  )
+export default function FileEditorPane({
+  fileId,
+}: {
+  fileId: string
+  key?: string
+}) {
+  const { node, setTitle, setContent } = useFileNode(fileId)
 
-  const node = data?.[0]
-  if (!node) return null // loading or row not found yet
+  if (!node) return null
 
   return (
-    <Tiptap
-      fileId={fileId}
-      title={node.title ?? "Untitled"}
-      content={node.content ?? ""}
-    />
+    <TabsContent value={fileId} className="flex-1 mt-0 border-0">
+      <Tiptap
+        title={node.title ?? "Untitled"}
+        content={node.content ?? ""}
+        onTitleChange={setTitle}
+        onContentChange={setContent}
+      />
+    </TabsContent>
   )
 }

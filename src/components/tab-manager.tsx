@@ -1,4 +1,4 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useFileContext } from "@/lib/file-context"
 import FileEditorPane from "@/components/file-editor-pane"
 import { useCallback } from "react"
@@ -105,15 +105,7 @@ export default function TabManager() {
         {deduplicatedOpenFiles.map((file) => {
           const fileId = file.fileSystemNode.id.toString()
 
-          return (
-            <TabsContent
-              key={`content-${fileId}`}
-              value={fileId}
-              className="flex-1 mt-0 border-0"
-            >
-              <FileEditorPane fileId={fileId} />
-            </TabsContent>
-          )
+          return <FileEditorPane key={`content-${fileId}`} fileId={fileId} />
         })}
       </Tabs>
     </div>

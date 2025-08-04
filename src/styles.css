@@ -149,4 +149,50 @@ code {
   .rounded-container-lg {
     @apply bg-card rounded-3xl p-8;
   }
+
+  /* File Tree Drag Animations - Linear-inspired buttery smoothness */
+  .tree-item-dragging {
+    @apply transform scale-95 shadow-xl opacity-80 z-50;
+    transition:
+      transform 0.12s cubic-bezier(0.25, 0.1, 0.25, 1),
+      box-shadow 0.12s cubic-bezier(0.25, 0.1, 0.25, 1),
+      opacity 0.12s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+
+  .tree-item-drop-zone {
+    @apply bg-primary/8 border-l-2 border-l-primary/60 rounded-md;
+    transition: all 0.18s cubic-bezier(0.25, 0.1, 0.25, 1);
+    animation: subtle-pulse 1.8s ease-in-out infinite;
+  }
+
+  .tree-item-dropped {
+    @apply transform scale-102;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes subtle-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+      background-color: rgb(from var(--primary) r g b / 0.08);
+    }
+    50% {
+      transform: scale(1.005);
+      background-color: rgb(from var(--primary) r g b / 0.12);
+    }
+  }
+
+  .tree-item-smooth {
+    transition: all 0.15s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+
+  /* Enhanced hover state for buttery smooth interactions */
+  .tree-item-smooth:hover {
+    transform: translateX(2px);
+  }
+
+  /* Hide cursor during drag to prevent green plus sign */
+  .tree-item-dragging * {
+    cursor: grabbing !important;
+  }
 }

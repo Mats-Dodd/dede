@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from "react"
-import { type FileTreeNode } from "@/lib/file-tree-utils"
+import { type FileTreeNode } from "@/lib/utils/file-tree-utils"
 
 interface FileContextType {
   selectedFileNode: FileTreeNode | undefined

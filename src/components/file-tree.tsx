@@ -7,15 +7,11 @@ import { cva } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const treeVariants = cva(
-  "group hover:before:opacity-100 before:absolute before:rounded-lg before:left-0 px-2 before:w-full before:opacity-0 before:bg-accent/70 before:h-[2rem] before:-z-10"
+  "group hover:before:opacity-100 before:absolute before:rounded-lg before:left-0 px-2 before:w-full before:opacity-0 before:bg-accent/50 before:h-[2rem] before:-z-10 tree-item-smooth"
 )
 
 const selectedTreeVariants = cva(
   "before:opacity-100 before:bg-accent/70 text-accent-foreground"
-)
-
-const dragOverVariants = cva(
-  "before:opacity-100 before:bg-primary/20 text-primary-foreground"
 )
 
 interface TreeDataItem {
@@ -240,6 +236,8 @@ const TreeNode = ({
     expandedItemIds.includes(item.id) ? [item.id] : []
   )
   const [isDragOver, setIsDragOver] = React.useState(false)
+  const [isDragging, setIsDragging] = React.useState(false)
+  const [justDropped, setJustDropped] = React.useState(false)
 
   const onDragStart = (e: React.DragEvent) => {
     if (!item.draggable) {
@@ -247,12 +245,26 @@ const TreeNode = ({
       return
     }
     e.dataTransfer.setData("text/plain", item.id)
+    e.dataTransfer.effectAllowed = "move"
+
+    // Hide the default drag image with green plus sign
+    const dragImage = new Image()
+    dragImage.src =
+      "data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 1 1'%3e%3c/svg%3e"
+    e.dataTransfer.setDragImage(dragImage, 0, 0)
+
+    setIsDragging(true)
     handleDragStart?.(item)
+  }
+
+  const onDragEnd = () => {
+    setIsDragging(false)
   }
 
   const onDragOver = (e: React.DragEvent) => {
     if (item.droppable !== false && draggedItem && draggedItem.id !== item.id) {
       e.preventDefault()
+      e.dataTransfer.dropEffect = "move"
       setIsDragOver(true)
     }
   }
@@ -264,7 +276,11 @@ const TreeNode = ({
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragOver(false)
+    setJustDropped(true)
     handleDrop?.(item)
+
+    // Reset drop animation after completion
+    setTimeout(() => setJustDropped(false), 400)
   }
 
   return (
@@ -277,8 +293,11 @@ const TreeNode = ({
         <AccordionTrigger
           className={cn(
             treeVariants(),
+            "tree-item-smooth",
             selectedItemId === item.id && selectedTreeVariants(),
-            isDragOver && dragOverVariants()
+            isDragOver && "tree-item-drop-zone",
+            isDragging && "tree-item-dragging",
+            justDropped && "tree-item-dropped"
           )}
           onClick={(e) => {
             if (e.ctrlKey || e.metaKey) {
@@ -295,6 +314,7 @@ const TreeNode = ({
           }}
           draggable={!!item.draggable}
           onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
@@ -355,6 +375,8 @@ const TreeLeaf = React.forwardRef<
     ref
   ) => {
     const [isDragOver, setIsDragOver] = React.useState(false)
+    const [isDragging, setIsDragging] = React.useState(false)
+    const [justDropped, setJustDropped] = React.useState(false)
 
     const onDragStart = (e: React.DragEvent) => {
       if (!item.draggable || item.disabled) {
@@ -362,7 +384,20 @@ const TreeLeaf = React.forwardRef<
         return
       }
       e.dataTransfer.setData("text/plain", item.id)
+      e.dataTransfer.effectAllowed = "move"
+
+      // Hide the default drag image with green plus sign
+      const dragImage = new Image()
+      dragImage.src =
+        "data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 1 1'%3e%3c/svg%3e"
+      e.dataTransfer.setDragImage(dragImage, 0, 0)
+
+      setIsDragging(true)
       handleDragStart?.(item)
+    }
+
+    const onDragEnd = () => {
+      setIsDragging(false)
     }
 
     const onDragOver = (e: React.DragEvent) => {
@@ -373,6 +408,7 @@ const TreeLeaf = React.forwardRef<
         draggedItem.id !== item.id
       ) {
         e.preventDefault()
+        e.dataTransfer.dropEffect = "move"
         setIsDragOver(true)
       }
     }
@@ -385,7 +421,11 @@ const TreeLeaf = React.forwardRef<
       if (item.disabled) return
       e.preventDefault()
       setIsDragOver(false)
+      setJustDropped(true)
       handleDrop?.(item)
+
+      // Reset drop animation after completion
+      setTimeout(() => setJustDropped(false), 400)
     }
 
     return (
@@ -394,9 +434,12 @@ const TreeLeaf = React.forwardRef<
         className={cn(
           "ml-5 flex text-left items-center py-2 cursor-pointer before:right-1",
           treeVariants(),
+          "tree-item-smooth",
           className,
           selectedItemId === item.id && selectedTreeVariants(),
-          isDragOver && dragOverVariants(),
+          isDragOver && "tree-item-drop-zone",
+          isDragging && "tree-item-dragging",
+          justDropped && "tree-item-dropped",
           item.disabled && "opacity-50 cursor-not-allowed pointer-events-none"
         )}
         onClick={(e) => {
@@ -416,6 +459,7 @@ const TreeLeaf = React.forwardRef<
         }}
         draggable={!!item.draggable && !item.disabled}
         onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}

@@ -7,7 +7,7 @@ import { fileSystemNodeCollection, projectCollection } from "@/lib/collections"
 import {
   transformFileSystemNodesToTree,
   type FileTreeNode,
-} from "@/lib/file-tree-utils"
+} from "@/lib/utils/file-tree-utils"
 import { useCreateFileWithNavigation } from "@/lib/use-create-file-with-navigation"
 import { useFileContext } from "@/lib/file-context"
 import { type FileSystemNode } from "@/db/schema"
@@ -21,6 +21,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { FolderPlusIcon, FilePlusIcon, TrashIcon, EditIcon } from "lucide-react"
+import {
+  joinPaths,
+  updateNodePath,
+  updateChildPaths,
+} from "@/lib/utils/path-utils"
 import { toast } from "sonner"
 
 interface ProjectFileTreeProps {
@@ -110,15 +115,9 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
 
     if (target.type !== "directory") return
 
-    const newPath =
-      target.path === "/"
-        ? `/${source.title}`
-        : `${target.path}/${source.title}`
+    const newPath = joinPaths(target.path, source.fileSystemNode.title)
 
-    fileSystemNodeCollection.update(source.id, (draft) => {
-      draft.path = newPath
-      draft.updatedAt = new Date()
-    })
+    updateNodePath(source.fileSystemNode, newPath, fileSystemNodes)
   }
 
   const handleCreateItem = async () => {
@@ -169,19 +168,9 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
       draft.updatedAt = new Date()
     })
 
-    // If this is a directory, update all child nodes' paths
+    // If this is a directory, update descendants automatically
     if (node.type === "directory") {
-      const childNodes = fileSystemNodes.filter((child) =>
-        child.path.startsWith(oldPath + "/")
-      )
-
-      childNodes.forEach((child) => {
-        const updatedChildPath = child.path.replace(oldPath, newPath)
-        fileSystemNodeCollection.update(child.id.toString(), (draft) => {
-          draft.path = updatedChildPath
-          draft.updatedAt = new Date()
-        })
-      })
+      updateChildPaths(oldPath, newPath, fileSystemNodes)
     }
 
     if (oldName !== newName) {

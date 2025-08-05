@@ -264,8 +264,8 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
 
   return (
     <>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between px-2">
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between px-2 pb-2">
           <h3 className="text-sm font-medium">Files</h3>
           <div className="flex gap-1">
             <Button
@@ -306,15 +306,41 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
         </div>
 
         {treeDataWithContextMenu.length > 0 ? (
-          <TreeView
-            data={treeDataWithContextMenu}
-            initialSelectedItemId={selectedFileNode?.id}
-            onSelectChange={handleNodeSelect}
-            onDocumentDrag={handleDocumentDrag}
-            className="min-h-[200px]"
-          />
+          <>
+            <TreeView
+              data={treeDataWithContextMenu}
+              initialSelectedItemId={selectedFileNode?.id}
+              onSelectChange={handleNodeSelect}
+              onDocumentDrag={handleDocumentDrag}
+              className="min-h-[200px]"
+            />
+            {/* Clickable area that fills remaining space */}
+            <div
+              className="flex-1 min-h-[100px]"
+              onContextMenu={(e) => {
+                e.preventDefault()
+                setContextMenu({
+                  open: true,
+                  x: e.clientX,
+                  y: e.clientY,
+                  node: null,
+                })
+              }}
+            />
+          </>
         ) : (
-          <div className="p-4 text-center text-sm text-muted-foreground">
+          <div
+            className="flex-1 p-4 text-center text-sm text-muted-foreground"
+            onContextMenu={(e) => {
+              e.preventDefault()
+              setContextMenu({
+                open: true,
+                x: e.clientX,
+                y: e.clientY,
+                node: null,
+              })
+            }}
+          >
             No files yet. Create your first file or folder.
           </div>
         )}
@@ -416,7 +442,7 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
       </Dialog>
 
       {/* Context Menu */}
-      {contextMenu.open && contextMenu.node && (
+      {contextMenu.open && (
         <div
           className="fixed z-50"
           style={{ left: contextMenu.x, top: contextMenu.y }}
@@ -428,14 +454,16 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
             }
           />
           <div className="bg-white border border-gray-200 rounded-md shadow-lg p-1 min-w-[160px] relative z-10">
-            {contextMenu.node.type === "directory" ? (
+            {!contextMenu.node || contextMenu.node.type === "directory" ? (
               <div className="space-y-1">
                 <button
                   onClick={() => {
                     setDialogState({
                       open: true,
                       type: "file",
-                      parentPath: contextMenu.node!.path,
+                      parentPath: contextMenu.node
+                        ? contextMenu.node.path
+                        : "/",
                       name: "",
                       isCreating: false,
                     })
@@ -452,7 +480,9 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
                     setDialogState({
                       open: true,
                       type: "directory",
-                      parentPath: contextMenu.node!.path,
+                      parentPath: contextMenu.node
+                        ? contextMenu.node.path
+                        : "/",
                       name: "",
                       isCreating: false,
                     })
@@ -464,26 +494,30 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
                   <FolderPlusIcon className="h-4 w-4" />
                   New Folder
                 </button>
-                <button
-                  onClick={() => {
-                    handleEdit(contextMenu.node!.fileSystemNode)
-                    setContextMenu({ open: false, x: 0, y: 0, node: null })
-                  }}
-                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm hover:bg-gray-100 rounded"
-                >
-                  <EditIcon className="h-4 w-4" />
-                  Rename
-                </button>
-                <button
-                  onClick={() => {
-                    handleDelete(contextMenu.node!.fileSystemNode)
-                    setContextMenu({ open: false, x: 0, y: 0, node: null })
-                  }}
-                  className="flex items-center gap-2 w-full px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded"
-                >
-                  <TrashIcon className="h-4 w-4" />
-                  Delete
-                </button>
+                {contextMenu.node && (
+                  <>
+                    <button
+                      onClick={() => {
+                        handleEdit(contextMenu.node!.fileSystemNode)
+                        setContextMenu({ open: false, x: 0, y: 0, node: null })
+                      }}
+                      className="flex items-center gap-2 w-full px-2 py-1.5 text-sm hover:bg-gray-100 rounded"
+                    >
+                      <EditIcon className="h-4 w-4" />
+                      Rename
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleDelete(contextMenu.node!.fileSystemNode)
+                        setContextMenu({ open: false, x: 0, y: 0, node: null })
+                      }}
+                      className="flex items-center gap-2 w-full px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                      Delete
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <div className="space-y-1">

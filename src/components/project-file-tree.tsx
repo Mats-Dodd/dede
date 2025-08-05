@@ -8,7 +8,6 @@ import {
   transformFileSystemNodesToTree,
   type FileTreeNode,
 } from "@/lib/utils/file-tree-utils"
-import { useCreateFileWithNavigation } from "@/lib/use-create-file-with-navigation"
 import { useFileContext } from "@/lib/file-context"
 import { type FileSystemNode } from "@/db/schema"
 import { Button } from "@/components/ui/button"
@@ -34,13 +33,19 @@ interface ProjectFileTreeProps {
 
 export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
   const { selectedFileNode, setSelectedFileNode } = useFileContext()
-  const { createFile, isCreating } = useCreateFileWithNavigation()
-  const [newItemDialog, setNewItemDialog] = useState<{
+  const [dialogState, setDialogState] = useState<{
     open: boolean
     type: "file" | "directory"
     parentPath: string
-  }>({ open: false, type: "file", parentPath: "/" })
-  const [newItemName, setNewItemName] = useState("")
+    name: string
+    isCreating: boolean
+  }>({
+    open: false,
+    type: "file",
+    parentPath: "/",
+    name: "",
+    isCreating: false,
+  })
   const [editDialog, setEditDialog] = useState<{
     open: boolean
     node: FileSystemNode | null
@@ -120,23 +125,50 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     updateNodePath(source.fileSystemNode, newPath, fileSystemNodes)
   }
 
+  const resetDialog = () => {
+    setDialogState({
+      open: false,
+      type: "file",
+      parentPath: "/",
+      name: "",
+      isCreating: false,
+    })
+  }
+
   const handleCreateItem = async () => {
-    if (!newItemName.trim() || !project || isCreating) return
+    if (!dialogState.name.trim() || !project || dialogState.isCreating) return
+
+    setDialogState((prev) => ({ ...prev, isCreating: true }))
 
     try {
-      await createFile({
+      const fullPath =
+        dialogState.parentPath === "/"
+          ? `/${dialogState.name.trim()}`
+          : `${dialogState.parentPath}/${dialogState.name.trim()}`
+
+      // Insert with temporary ID - Electric will sync back real ID
+      await fileSystemNodeCollection.insert({
+        id: Math.floor(Math.random() * 100000), // Temporary ID required
         projectId,
-        parentPath: newItemDialog.parentPath,
-        name: newItemName.trim(),
-        type: newItemDialog.type,
+        path: fullPath,
+        title: dialogState.name.trim(),
+        type: dialogState.type,
+        content: null,
+        metadata: {},
+        isDeleted: false,
+        userIds: [project.ownerId, ...project.sharedUserIds], // Critical for sync
+        createdAt: new Date(),
+        updatedAt: new Date(),
       })
 
-      // Close dialog and reset form
-      setNewItemName("")
-      setNewItemDialog({ open: false, type: "file", parentPath: "/" })
+      toast.success(
+        `${dialogState.type === "directory" ? "📁 Folder" : "📄 File"} '${dialogState.name.trim()}' created`
+      )
+      resetDialog()
     } catch (error) {
-      console.error("Error creating file:", error)
-      toast.error(`Failed to create ${newItemDialog.type}`)
+      console.error("Creation error:", error)
+      toast.error(`Failed to create ${dialogState.type}`)
+      setDialogState((prev) => ({ ...prev, isCreating: false }))
     }
   }
 
@@ -240,10 +272,16 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
               variant="ghost"
               size="sm"
               onClick={() =>
-                setNewItemDialog({ open: true, type: "file", parentPath: "/" })
+                setDialogState({
+                  open: true,
+                  type: "file",
+                  parentPath: "/",
+                  name: "",
+                  isCreating: false,
+                })
               }
               className="h-6 w-6 p-0"
-              disabled={isCreating}
+              disabled={dialogState.isCreating}
             >
               <FilePlusIcon className="h-3 w-3" />
             </Button>
@@ -251,14 +289,16 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
               variant="ghost"
               size="sm"
               onClick={() =>
-                setNewItemDialog({
+                setDialogState({
                   open: true,
                   type: "directory",
                   parentPath: "/",
+                  name: "",
+                  isCreating: false,
                 })
               }
               className="h-6 w-6 p-0"
-              disabled={isCreating}
+              disabled={dialogState.isCreating}
             >
               <FolderPlusIcon className="h-3 w-3" />
             </Button>
@@ -282,40 +322,46 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
 
       {/* New Item Dialog */}
       <Dialog
-        open={newItemDialog.open}
-        onOpenChange={(open) => setNewItemDialog({ ...newItemDialog, open })}
+        open={dialogState.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            resetDialog()
+          } else {
+            setDialogState((prev) => ({ ...prev, open }))
+          }
+        }}
       >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Create New {newItemDialog.type === "file" ? "File" : "Folder"}
+              Create New {dialogState.type === "file" ? "File" : "Folder"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium">Name</label>
               <Input
-                value={newItemName}
-                onChange={(e) => setNewItemName(e.target.value)}
-                placeholder={`${newItemDialog.type === "file" ? "file" : "folder"}.${newItemDialog.type === "file" ? "txt" : ""}`}
+                value={dialogState.name}
+                onChange={(e) =>
+                  setDialogState((prev) => ({ ...prev, name: e.target.value }))
+                }
+                placeholder={`${dialogState.type === "file" ? "file" : "folder"}.${dialogState.type === "file" ? "txt" : ""}`}
                 onKeyDown={(e) => e.key === "Enter" && handleCreateItem()}
               />
             </div>
             <div className="text-sm text-muted-foreground">
-              Location: {newItemDialog.parentPath}
+              Location: {dialogState.parentPath}
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() =>
-                setNewItemDialog({ open: false, type: "file", parentPath: "/" })
-              }
-            >
+            <Button variant="outline" onClick={resetDialog}>
               Cancel
             </Button>
-            <Button onClick={handleCreateItem} disabled={isCreating}>
-              {isCreating ? "Creating..." : "Create"}
+            <Button
+              onClick={handleCreateItem}
+              disabled={dialogState.isCreating}
+            >
+              {dialogState.isCreating ? "Creating..." : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -386,30 +432,34 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
               <div className="space-y-1">
                 <button
                   onClick={() => {
-                    setNewItemDialog({
+                    setDialogState({
                       open: true,
                       type: "file",
                       parentPath: contextMenu.node!.path,
+                      name: "",
+                      isCreating: false,
                     })
                     setContextMenu({ open: false, x: 0, y: 0, node: null })
                   }}
                   className="flex items-center gap-2 w-full px-2 py-1.5 text-sm hover:bg-gray-100 rounded"
-                  disabled={isCreating}
+                  disabled={dialogState.isCreating}
                 >
                   <FilePlusIcon className="h-4 w-4" />
                   New File
                 </button>
                 <button
                   onClick={() => {
-                    setNewItemDialog({
+                    setDialogState({
                       open: true,
                       type: "directory",
                       parentPath: contextMenu.node!.path,
+                      name: "",
+                      isCreating: false,
                     })
                     setContextMenu({ open: false, x: 0, y: 0, node: null })
                   }}
                   className="flex items-center gap-2 w-full px-2 py-1.5 text-sm hover:bg-gray-100 rounded"
-                  disabled={isCreating}
+                  disabled={dialogState.isCreating}
                 >
                   <FolderPlusIcon className="h-4 w-4" />
                   New Folder

@@ -125,6 +125,33 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     updateNodePath(source.fileSystemNode, newPath, fileSystemNodes)
   }
 
+  const handleRootDrop = (sourceItem: TreeDataItem) => {
+    if (!("fileSystemNode" in sourceItem)) return
+
+    const source = sourceItem as FileTreeNode
+    const fileName = source.fileSystemNode.title
+    const currentPath = source.fileSystemNode.path
+    const targetPath = `/${fileName}`
+
+    // Skip if already at root
+    if (currentPath === targetPath) {
+      toast.info(`'${fileName}' is already at root level`)
+      return
+    }
+
+    // Check for name conflicts at root
+    const existingAtRoot = fileSystemNodes.find(
+      (node) => node.path === targetPath && !node.isDeleted
+    )
+    if (existingAtRoot) {
+      toast.error(`Item '${fileName}' already exists at root`)
+      return
+    }
+
+    updateNodePath(source.fileSystemNode, targetPath, fileSystemNodes)
+    toast.success(`📁 Moved '${fileName}' to root`)
+  }
+
   const resetDialog = () => {
     setDialogState({
       open: false,
@@ -312,6 +339,7 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
               initialSelectedItemId={selectedFileNode?.id}
               onSelectChange={handleNodeSelect}
               onDocumentDrag={handleDocumentDrag}
+              onRootDrop={handleRootDrop}
               className="min-h-[200px]"
             />
             {/* Clickable area that fills remaining space */}

@@ -749,18 +749,18 @@ export function AppSidebar() {
 
       <SidebarContent>
         {selectedProjectId && (
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <div className="group-data-[collapsible=icon]:hidden">
+          <SidebarGroup className="flex-1">
+            <SidebarGroupContent className="h-full">
+              <div className="group-data-[collapsible=icon]:hidden h-full">
                 <ProjectFileTree projectId={selectedProjectId} />
               </div>
             </SidebarGroupContent>
           </SidebarGroup>
         )}
         {!selectedProjectId && (
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <div className="p-4 text-sm text-muted-foreground group-data-[collapsible=icon]:hidden">
+          <SidebarGroup className="flex-1">
+            <SidebarGroupContent className="h-full">
+              <div className="p-4 text-sm text-muted-foreground group-data-[collapsible=icon]:hidden h-full">
                 Select a project from the navbar to view files
               </div>
             </SidebarGroupContent>

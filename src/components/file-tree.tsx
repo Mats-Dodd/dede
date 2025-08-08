@@ -37,6 +37,7 @@ type TreeProps = React.HTMLAttributes<HTMLDivElement> & {
   defaultNodeIcon?: React.ComponentType<{ className?: string }>
   defaultLeafIcon?: React.ComponentType<{ className?: string }>
   onDocumentDrag?: (sourceItem: TreeDataItem, targetItem: TreeDataItem) => void
+  onRootDrop?: (item: TreeDataItem) => void
 }
 
 const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
@@ -50,6 +51,7 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
       defaultNodeIcon,
       className,
       onDocumentDrag,
+      onRootDrop,
       ...props
     },
     ref
@@ -133,7 +135,17 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
         />
         <div
           className="w-full h-[48px]"
-          onDrop={(_e) => {
+          onDragOver={(e) => {
+            if (draggedItem) {
+              e.preventDefault()
+              e.dataTransfer.dropEffect = "move"
+            }
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            if (draggedItem && onRootDrop) {
+              onRootDrop(draggedItem)
+            }
             setDraggedItem(null)
           }}
         ></div>

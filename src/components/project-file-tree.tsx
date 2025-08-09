@@ -32,7 +32,8 @@ interface ProjectFileTreeProps {
 }
 
 export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
-  const { selectedFileNode, setSelectedFileNode } = useFileContext()
+  const { selectedFileNode, setSelectedFileNode, updateOpenFilePaths } =
+    useFileContext()
   const [lastCreatedPath, setLastCreatedPath] = useState<string | undefined>()
   const [dialogState, setDialogState] = useState<{
     open: boolean
@@ -127,9 +128,11 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
 
     if (target.type !== "directory") return
 
+    const oldPath = source.fileSystemNode.path
     const newPath = joinPaths(target.path, source.fileSystemNode.title)
 
     updateNodePath(source.fileSystemNode, newPath, fileSystemNodes)
+    updateOpenFilePaths(oldPath, newPath, source.type === "directory")
   }
 
   const handleRootDrop = (sourceItem: TreeDataItem) => {
@@ -156,6 +159,7 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     }
 
     updateNodePath(source.fileSystemNode, targetPath, fileSystemNodes)
+    updateOpenFilePaths(currentPath, targetPath, source.type === "directory")
     toast.success(`📁 Moved '${fileName}' to root`)
   }
 
@@ -242,6 +246,9 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     if (node.type === "directory") {
       updateChildPaths(oldPath, newPath, fileSystemNodes)
     }
+
+    // Sync open tabs and active file path
+    updateOpenFilePaths(oldPath, newPath, node.type === "directory")
 
     if (oldName !== newName) {
       toast.success(`✏️ '${oldName}' renamed to '${newName}'`)

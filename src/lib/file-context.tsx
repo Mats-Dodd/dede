@@ -1,4 +1,10 @@
-import { createContext, useContext, useState, type ReactNode } from "react"
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  type ReactNode,
+} from "react"
 import { type FileTreeNode } from "@/lib/utils/file-tree-utils"
 
 interface FileContextType {
@@ -9,6 +15,11 @@ interface FileContextType {
   openFile: (node: FileTreeNode) => void
   closeFile: (filePath: string) => void
   setActiveFile: (filePath: string) => void
+  updateOpenFilePaths: (
+    oldPath: string,
+    newPath: string,
+    isDirectory: boolean
+  ) => void
 }
 
 const FileContext = createContext<FileContextType | null>(null)
@@ -78,6 +89,58 @@ export function FileProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const updateOpenFilePaths = useCallback(
+    (oldPath: string, newPath: string, isDirectory: boolean) => {
+      setOpenFiles((prev) => {
+        const oldPrefix = oldPath.endsWith("/") ? oldPath : oldPath + "/"
+        const newPrefix = newPath.endsWith("/") ? newPath : newPath + "/"
+
+        return prev.map((file) => {
+          const currentPath = file.fileSystemNode.path
+          let updatedPath = currentPath
+
+          if (isDirectory) {
+            if (currentPath === oldPath) {
+              updatedPath = newPath
+            } else if (currentPath.startsWith(oldPrefix)) {
+              updatedPath = currentPath.replace(oldPrefix, newPrefix)
+            }
+          } else {
+            if (currentPath === oldPath) {
+              updatedPath = newPath
+            }
+          }
+
+          if (updatedPath !== currentPath) {
+            return {
+              ...file,
+              path: updatedPath,
+              fileSystemNode: {
+                ...file.fileSystemNode,
+                path: updatedPath,
+              },
+            }
+          }
+          return file
+        })
+      })
+
+      setActiveFilePath((prev) => {
+        if (!prev) return prev
+        if (isDirectory) {
+          const oldPrefix = oldPath.endsWith("/") ? oldPath : oldPath + "/"
+          const newPrefix = newPath.endsWith("/") ? newPath : newPath + "/"
+          if (prev === oldPath) return newPath
+          if (prev.startsWith(oldPrefix))
+            return prev.replace(oldPrefix, newPrefix)
+          return prev
+        }
+        return prev === oldPath ? newPath : prev
+      })
+    },
+    []
+  )
+
   return (
     <FileContext.Provider
       value={{
@@ -88,6 +151,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
         openFile,
         closeFile,
         setActiveFile,
+        updateOpenFilePaths,
       }}
     >
       {children}

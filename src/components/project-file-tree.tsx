@@ -33,6 +33,7 @@ interface ProjectFileTreeProps {
 
 export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
   const { selectedFileNode, setSelectedFileNode } = useFileContext()
+  const [lastCreatedPath, setLastCreatedPath] = useState<string | undefined>()
   const [dialogState, setDialogState] = useState<{
     open: boolean
     type: "file" | "directory"
@@ -93,7 +94,8 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
   const project = projects[0]
 
   const treeData = useMemo(() => {
-    return transformFileSystemNodesToTree(fileSystemNodes)
+    const tree = transformFileSystemNodesToTree(fileSystemNodes)
+    return tree
   }, [fileSystemNodes])
 
   const handleNodeSelect = (item: TreeDataItem | undefined) => {
@@ -102,6 +104,11 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
       // Only set selectedFileNode for actual files, not directories
       if (fileNode.type === "file") {
         setSelectedFileNode(fileNode)
+      }
+
+      // Clear the lastCreatedPath after successful selection
+      if (lastCreatedPath && fileNode.path === lastCreatedPath) {
+        setLastCreatedPath(undefined)
       }
     } else {
       setSelectedFileNode(undefined)
@@ -191,6 +198,10 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
       toast.success(
         `${dialogState.type === "directory" ? "📁 Folder" : "📄 File"} '${dialogState.name.trim()}' created`
       )
+
+      // Set the path to auto-expand and select the newly created item
+      setLastCreatedPath(fullPath)
+
       resetDialog()
     } catch (error) {
       console.error("Creation error:", error)
@@ -337,11 +348,17 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
             <TreeView
               data={treeDataWithContextMenu}
               initialSelectedItemId={selectedFileNode?.id}
+              initialSelectedPath={lastCreatedPath}
               onSelectChange={handleNodeSelect}
               onDocumentDrag={handleDocumentDrag}
               onRootDrop={handleRootDrop}
               className="min-h-[200px]"
             />
+            {lastCreatedPath && (
+              <div className="text-xs text-muted-foreground p-2">
+                Debug: lastCreatedPath = {lastCreatedPath}
+              </div>
+            )}
             {/* Clickable area that fills remaining space */}
             <div
               className="flex-1 min-h-[100px]"

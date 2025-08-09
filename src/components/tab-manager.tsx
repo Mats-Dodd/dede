@@ -10,7 +10,8 @@ import {
 import { useTabNavigation } from "@/lib/hooks/use-tab-navigation"
 
 export default function TabManager() {
-  const { openFiles, activeFileId, setActiveFile, closeFile } = useFileContext()
+  const { openFiles, activeFilePath, setActiveFile, closeFile } =
+    useFileContext()
 
   // Tab navigation actions
   const { goToNextTab, goToPreviousTab, goToTabByIndex, goToLastTab } =
@@ -49,9 +50,9 @@ export default function TabManager() {
   )
 
   const handleCloseTab = useCallback(
-    (fileId: string, e: React.MouseEvent) => {
+    (filePath: string, e: React.MouseEvent) => {
       e.stopPropagation()
-      closeFile(fileId)
+      closeFile(filePath)
     },
     [closeFile]
   )
@@ -75,22 +76,22 @@ export default function TabManager() {
   return (
     <div className="h-full flex flex-col">
       <Tabs
-        value={activeFileId}
+        value={activeFilePath}
         onValueChange={setActiveFile}
         className="flex-1 flex flex-col"
       >
         <TabsList className="shrink-0">
           {deduplicatedOpenFiles.map((file) => {
-            const fileId = file.fileSystemNode.id.toString()
+            const filePath = file.fileSystemNode.path
             const fileName = file.fileSystemNode.title || "Untitled"
 
             return (
-              <div key={`tab-${fileId}`} className="relative group">
-                <TabsTrigger value={fileId} className="pr-8 max-w-48">
+              <div key={`tab-${filePath}`} className="relative group">
+                <TabsTrigger value={filePath} className="pr-8 max-w-48">
                   <span className="truncate">{fileName}</span>
                 </TabsTrigger>
                 <button
-                  onClick={(e) => handleCloseTab(fileId, e)}
+                  onClick={(e) => handleCloseTab(filePath, e)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-data-[state=active]:opacity-100 hover:bg-muted rounded-sm p-0.5 transition-all duration-200 cursor-pointer z-10"
                   type="button"
                   aria-label={`Close ${fileName}`}
@@ -103,9 +104,11 @@ export default function TabManager() {
         </TabsList>
 
         {deduplicatedOpenFiles.map((file) => {
-          const fileId = file.fileSystemNode.id.toString()
+          const filePath = file.fileSystemNode.path
 
-          return <FileEditorPane key={`content-${fileId}`} fileId={fileId} />
+          return (
+            <FileEditorPane key={`content-${filePath}`} filePath={filePath} />
+          )
         })}
       </Tabs>
     </div>

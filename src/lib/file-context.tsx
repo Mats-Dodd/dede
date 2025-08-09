@@ -5,10 +5,10 @@ interface FileContextType {
   selectedFileNode: FileTreeNode | undefined
   setSelectedFileNode: (node: FileTreeNode | undefined) => void
   openFiles: FileTreeNode[]
-  activeFileId: string | undefined
+  activeFilePath: string | undefined
   openFile: (node: FileTreeNode) => void
-  closeFile: (nodeId: string) => void
-  setActiveFile: (nodeId: string) => void
+  closeFile: (filePath: string) => void
+  setActiveFile: (filePath: string) => void
 }
 
 const FileContext = createContext<FileContextType | null>(null)
@@ -18,19 +18,17 @@ export function FileProvider({ children }: { children: ReactNode }) {
     FileTreeNode | undefined
   >()
   const [openFiles, setOpenFiles] = useState<FileTreeNode[]>([])
-  const [activeFileId, setActiveFileId] = useState<string | undefined>()
+  const [activeFilePath, setActiveFilePath] = useState<string | undefined>()
 
   const openFile = (node: FileTreeNode) => {
     if (node.fileSystemNode.type !== "file") return
 
-    const nodeId = node.fileSystemNode.id.toString()
+    const filePath = node.fileSystemNode.path
 
     setOpenFiles((prev) => {
-      // Check for existing file with same path and title (handles temp ID vs real ID case)
+      // Check for existing file with same path (handles temp ID vs real ID case)
       const existingIndex = prev.findIndex(
-        (f) =>
-          f.fileSystemNode.path === node.fileSystemNode.path &&
-          f.fileSystemNode.title === node.fileSystemNode.title
+        (f) => f.fileSystemNode.path === filePath
       )
 
       if (existingIndex >= 0) {
@@ -38,41 +36,32 @@ export function FileProvider({ children }: { children: ReactNode }) {
         const newFiles = [...prev]
         newFiles[existingIndex] = node
 
-        setActiveFileId(nodeId)
+        setActiveFilePath(filePath)
         setSelectedFileNode(node)
         return newFiles
-      }
-
-      // Don't add if already open by ID (fallback check)
-      if (prev.some((f) => f.fileSystemNode.id.toString() === nodeId)) {
-        setActiveFileId(nodeId)
-        setSelectedFileNode(node)
-        return prev
       }
 
       // Add to open files and make it active
       const newFiles = [...prev, node]
 
-      setActiveFileId(nodeId)
+      setActiveFilePath(filePath)
       setSelectedFileNode(node)
       return newFiles
     })
   }
 
-  const closeFile = (nodeId: string) => {
+  const closeFile = (filePath: string) => {
     setOpenFiles((prev) => {
-      const filtered = prev.filter(
-        (f) => f.fileSystemNode.id.toString() !== nodeId
-      )
+      const filtered = prev.filter((f) => f.fileSystemNode.path !== filePath)
 
       // If closing the active file, switch to another open file or clear selection
-      if (activeFileId === nodeId) {
+      if (activeFilePath === filePath) {
         if (filtered.length > 0) {
           const nextFile = filtered[filtered.length - 1]
-          setActiveFileId(nextFile.fileSystemNode.id.toString())
+          setActiveFilePath(nextFile.fileSystemNode.path)
           setSelectedFileNode(nextFile)
         } else {
-          setActiveFileId(undefined)
+          setActiveFilePath(undefined)
           setSelectedFileNode(undefined)
         }
       }
@@ -81,12 +70,10 @@ export function FileProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  const setActiveFile = (nodeId: string) => {
-    const file = openFiles.find(
-      (f) => f.fileSystemNode.id.toString() === nodeId
-    )
+  const setActiveFile = (filePath: string) => {
+    const file = openFiles.find((f) => f.fileSystemNode.path === filePath)
     if (file) {
-      setActiveFileId(nodeId)
+      setActiveFilePath(filePath)
       setSelectedFileNode(file)
     }
   }
@@ -97,7 +84,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
         selectedFileNode,
         setSelectedFileNode: openFile, // Update legacy usage to open file
         openFiles,
-        activeFileId,
+        activeFilePath,
         openFile,
         closeFile,
         setActiveFile,

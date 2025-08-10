@@ -22,8 +22,6 @@ export function acquireLoroDoc(key: string): LoroDoc {
       isApplyingRemote: false,
     }
     loroRegistry.set(key, entry)
-
-    console.log("[Loro] Created shared LoroDoc", { key })
   }
   entry.refCount += 1
   return entry.doc
@@ -35,8 +33,6 @@ export function releaseLoroDoc(key: string) {
   entry.refCount -= 1
   if (entry.refCount <= 0) {
     loroRegistry.delete(key)
-
-    console.log("[Loro] Disposed shared LoroDoc", { key })
   }
 }
 

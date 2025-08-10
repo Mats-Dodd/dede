@@ -32,20 +32,42 @@ export function base64ToBytes(b64: Base64String): Uint8Array {
 }
 
 // Local, typed wrappers around Loro export flows to avoid leaking any
-type LoroDocWithExport = LoroDoc & {
+// Keep this structural without extending the generic exported LoroDoc type
+// to avoid version() return type mismatches. We rely on duck-typing at runtime.
+export interface LoroDocWithExport {
   export: (
     opts: { mode: "snapshot" } | { mode: "update"; from?: LoroVersion }
   ) => Uint8Array
   version: () => LoroVersion
 }
 
+export function isLoroDocWithExport(
+  doc: LoroDoc | unknown
+): doc is LoroDocWithExport {
+  return (
+    !!(doc as LoroDocWithExport)?.export &&
+    typeof (doc as LoroDocWithExport).export === "function" &&
+    !!(doc as LoroDocWithExport)?.version &&
+    typeof (doc as LoroDocWithExport).version === "function"
+  )
+}
+
 export function loroExportSnapshot(doc: LoroDoc): Uint8Array {
-  const d = doc as unknown as LoroDocWithExport
-  return d.export({ mode: "snapshot" })
+  if (isLoroDocWithExport(doc)) {
+    return doc.export({ mode: "snapshot" })
+  }
+  // Fallback cast; should not happen but keeps runtime resilient
+  return (doc as LoroDocWithExport).export({ mode: "snapshot" })
 }
 
 export function loroExportUpdate(doc: LoroDoc, from?: LoroVersion): Uint8Array {
-  const d = doc as unknown as LoroDocWithExport
+  if (isLoroDocWithExport(doc)) {
+    if (from !== undefined) {
+      return doc.export({ mode: "update", from })
+    }
+    return doc.export({ mode: "update" })
+  }
+  const d = doc as LoroDocWithExport
   if (from !== undefined) {
     return d.export({ mode: "update", from })
   }

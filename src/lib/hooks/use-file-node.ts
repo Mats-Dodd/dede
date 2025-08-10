@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react"
+import { useCallback, useMemo } from "react"
 import { useLiveQuery } from "@tanstack/react-db"
 import { eq } from "@tanstack/react-db"
 import { fileSystemNodeCollection } from "@/lib/collections"
@@ -35,9 +35,10 @@ export function useFileNode(fileId: string) {
     [fileId]
   )
 
-  const debouncedUpdateTitle = useRef(
-    debounce((t: string) => updateImmediate({ title: t }), 300)
-  ).current
+  const debouncedUpdateTitle = useMemo(
+    () => debounce((t: string) => updateImmediate({ title: t }), 300),
+    [updateImmediate]
+  )
 
   const setTitle = useCallback(
     (t: string) => debouncedUpdateTitle(t),
@@ -51,18 +52,7 @@ export function useFileNode(fileId: string) {
     (base64: Base64String) => updateImmediate({ contentCRDT: base64 }),
     [updateImmediate]
   )
-  const setMetadata = useCallback(
-    (meta: Partial<FileSystemNode["metadata"]>) =>
-      updateImmediate({
-        metadata: {
-          ...(node?.metadata ?? {}),
-          ...meta,
-        },
-      } as Partial<FileSystemNode>),
-    [updateImmediate, node]
-  )
-
-  return { node, setTitle, setContent, setContentCRDT, setMetadata }
+  return { node, setTitle, setContent, setContentCRDT }
 }
 
 export function useFileNodeByPath(filePath: string) {
@@ -85,9 +75,10 @@ export function useFileNodeByPath(filePath: string) {
     [node]
   )
 
-  const debouncedUpdateTitle = useRef(
-    debounce((t: string) => updateImmediate({ title: t }), 300)
-  ).current
+  const debouncedUpdateTitle = useMemo(
+    () => debounce((t: string) => updateImmediate({ title: t }), 300),
+    [updateImmediate]
+  )
 
   const setTitle = useCallback(
     (t: string) => debouncedUpdateTitle(t),
@@ -101,16 +92,5 @@ export function useFileNodeByPath(filePath: string) {
     (base64: Base64String) => updateImmediate({ contentCRDT: base64 }),
     [updateImmediate]
   )
-  const setMetadata = useCallback(
-    (meta: Partial<FileSystemNode["metadata"]>) =>
-      updateImmediate({
-        metadata: {
-          ...(node?.metadata ?? {}),
-          ...meta,
-        },
-      } as Partial<FileSystemNode>),
-    [updateImmediate, node]
-  )
-
-  return { node, setTitle, setContent, setContentCRDT, setMetadata }
+  return { node, setTitle, setContent, setContentCRDT }
 }

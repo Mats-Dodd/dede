@@ -1,6 +1,6 @@
 import { useEditor, EditorContent } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState, memo, useCallback } from "react"
 import type { LoroDoc } from "loro-crdt"
 import { Extension } from "@tiptap/core"
 import { keymap } from "prosemirror-keymap"
@@ -21,40 +21,36 @@ interface TiptapProps {
 const Tiptap = ({ title, loroDoc, onTitleChange, onDirty }: TiptapProps) => {
   const [titleValue, setTitleValue] = useState(title || "")
 
-  const editorExtensions = loroDoc
-    ? [
-        StarterKit as unknown as Extension,
-        Extension.create({
-          name: "loro",
-          addProseMirrorPlugins() {
-            console.log("[Editor] Adding Loro plugins", { hasLoro: !!loroDoc })
-            return [
-              LoroSyncPlugin({
-                doc: loroDoc as unknown as Parameters<
-                  typeof LoroSyncPlugin
-                >[0]["doc"],
-              }),
-              LoroUndoPlugin({
-                doc: loroDoc as unknown as Parameters<
-                  typeof LoroUndoPlugin
-                >[0]["doc"],
-              }),
-              keymap({ "Mod-z": undo, "Mod-y": redo, "Mod-Shift-z": redo }),
-            ]
-          },
-        }),
-      ]
-    : [StarterKit as unknown as Extension]
+  const editorExtensions = useMemo(() => {
+    if (!loroDoc) return [StarterKit as unknown as Extension]
+    return [
+      StarterKit as unknown as Extension,
+      Extension.create({
+        name: "loro",
+        addProseMirrorPlugins() {
+          return [
+            LoroSyncPlugin({
+              doc: loroDoc as unknown as Parameters<
+                typeof LoroSyncPlugin
+              >[0]["doc"],
+            }),
+            LoroUndoPlugin({
+              doc: loroDoc as unknown as Parameters<
+                typeof LoroUndoPlugin
+              >[0]["doc"],
+            }),
+            keymap({ "Mod-z": undo, "Mod-y": redo, "Mod-Shift-z": redo }),
+          ]
+        },
+      }),
+    ]
+  }, [loroDoc])
 
   const editor = useEditor(
     {
       extensions: editorExtensions as unknown as EditorExtensions,
-      onCreate: () => {
-        console.log("[Editor] created", { hasLoro: !!loroDoc })
-      },
-      onUpdate: ({ editor }) => {
-        const text = editor.state.doc.textContent
-        console.log("[Editor] onUpdate", { length: text.length })
+      onCreate: () => {},
+      onUpdate: () => {
         onDirty?.()
       },
     },
@@ -65,11 +61,14 @@ const Tiptap = ({ title, loroDoc, onTitleChange, onDirty }: TiptapProps) => {
     setTitleValue(title || "")
   }, [title])
 
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTitle = e.target.value
-    setTitleValue(newTitle)
-    onTitleChange?.(newTitle)
-  }
+  const handleTitleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newTitle = e.target.value
+      setTitleValue(newTitle)
+      onTitleChange?.(newTitle)
+    },
+    [onTitleChange]
+  )
 
   return (
     <div className="h-full flex justify-center py-12">
@@ -93,4 +92,4 @@ const Tiptap = ({ title, loroDoc, onTitleChange, onDirty }: TiptapProps) => {
   )
 }
 
-export default Tiptap
+export default memo(Tiptap)

@@ -17,6 +17,7 @@ const selectedTreeVariants = cva(
 interface TreeDataItem {
   id: string
   name: string
+  path?: string
   icon?: React.ComponentType<{ className?: string }>
   selectedIcon?: React.ComponentType<{ className?: string }>
   openIcon?: React.ComponentType<{ className?: string }>
@@ -32,6 +33,7 @@ interface TreeDataItem {
 type TreeProps = React.HTMLAttributes<HTMLDivElement> & {
   data: TreeDataItem[] | TreeDataItem
   initialSelectedItemId?: string
+  initialSelectedPath?: string
   onSelectChange?: (item: TreeDataItem | undefined) => void
   expandAll?: boolean
   defaultNodeIcon?: React.ComponentType<{ className?: string }>
@@ -45,6 +47,7 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
     {
       data,
       initialSelectedItemId,
+      initialSelectedPath,
       onSelectChange,
       expandAll,
       defaultLeafIcon,
@@ -56,13 +59,62 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
     },
     ref
   ) => {
+    // Helper function to find item by path
+    const findItemByPath = React.useCallback(
+      (
+        items: TreeDataItem[] | TreeDataItem,
+        targetPath: string
+      ): TreeDataItem | undefined => {
+        if (!(items instanceof Array)) {
+          items = [items]
+        }
+
+        for (const item of items) {
+          if (item.path === targetPath) {
+            return item
+          }
+          if (item.children) {
+            const found = findItemByPath(item.children, targetPath)
+            if (found) return found
+          }
+        }
+        return undefined
+      },
+      []
+    )
+
+    // Determine initial selected ID from either ID or path
+    const initialId = React.useMemo(() => {
+      if (initialSelectedItemId) {
+        return initialSelectedItemId
+      }
+      if (initialSelectedPath) {
+        const item = findItemByPath(data, initialSelectedPath)
+        return item?.id
+      }
+      return undefined
+    }, [initialSelectedItemId, initialSelectedPath, data, findItemByPath])
+
     const [selectedItemId, setSelectedItemId] = React.useState<
       string | undefined
-    >(initialSelectedItemId)
+    >(initialId)
 
     const [draggedItem, setDraggedItem] = React.useState<TreeDataItem | null>(
       null
     )
+
+    // Update selection when initialSelectedPath changes
+    React.useEffect(() => {
+      if (initialSelectedPath) {
+        const item = findItemByPath(data, initialSelectedPath)
+        if (item) {
+          setSelectedItemId(item.id)
+          if (onSelectChange) {
+            onSelectChange(item)
+          }
+        }
+      }
+    }, [initialSelectedPath, data, findItemByPath, onSelectChange])
 
     const handleSelectChange = React.useCallback(
       (item: TreeDataItem | undefined) => {
@@ -89,7 +141,9 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
     )
 
     const expandedItemIds = React.useMemo(() => {
-      if (!initialSelectedItemId) {
+      // Use selectedItemId (current selection) instead of initialId
+      const targetId = selectedItemId || initialId
+      if (!targetId) {
         return [] as string[]
       }
 
@@ -114,9 +168,9 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
         }
       }
 
-      walkTreeItems(data, initialSelectedItemId)
+      walkTreeItems(data, targetId)
       return ids
-    }, [data, expandAll, initialSelectedItemId])
+    }, [data, expandAll, initialId, selectedItemId])
 
     return (
       <div className={cn("overflow-hidden relative p-2", className)}>
@@ -250,6 +304,13 @@ const TreeNode = ({
   const [isDragOver, setIsDragOver] = React.useState(false)
   const [isDragging, setIsDragging] = React.useState(false)
   const [justDropped, setJustDropped] = React.useState(false)
+
+  // Sync accordion state when expandedItemIds changes
+  React.useEffect(() => {
+    if (expandedItemIds.includes(item.id) && !value.includes(item.id)) {
+      setValue([item.id])
+    }
+  }, [expandedItemIds, item.id])
 
   const onDragStart = (e: React.DragEvent) => {
     if (!item.draggable) {

@@ -24,7 +24,7 @@ import {
 
 export default function Navbar() {
   const { toggleSidebar } = useSidebar()
-  const { selectedFileNode } = useFileContext()
+  const { selectedFileNode, activeFilePath } = useFileContext()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -100,29 +100,34 @@ export default function Navbar() {
                       </SelectContent>
                     </Select>
                   </BreadcrumbItem>
-                  {selectedFileNode &&
-                    selectedFileNode.fileSystemNode.type === "file" &&
-                    (() => {
-                      const cleanPath = selectedFileNode.path.startsWith("/")
-                        ? selectedFileNode.path.slice(1)
-                        : selectedFileNode.path
-                      const pathSegments = cleanPath.split("/").filter(Boolean)
+                  {(() => {
+                    const fallbackPath =
+                      selectedFileNode?.fileSystemNode.type === "file"
+                        ? selectedFileNode.path
+                        : undefined
+                    const pathForBreadcrumb = activeFilePath || fallbackPath
+                    if (!pathForBreadcrumb) return null
 
-                      return pathSegments.map((segment, index) => (
-                        <React.Fragment key={index}>
-                          <BreadcrumbSeparator> / </BreadcrumbSeparator>
-                          <BreadcrumbItem>
-                            {index === pathSegments.length - 1 ? (
-                              <BreadcrumbPage>{segment}</BreadcrumbPage>
-                            ) : (
-                              <span className="text-muted-foreground">
-                                {segment}
-                              </span>
-                            )}
-                          </BreadcrumbItem>
-                        </React.Fragment>
-                      ))
-                    })()}
+                    const cleanPath = pathForBreadcrumb.startsWith("/")
+                      ? pathForBreadcrumb.slice(1)
+                      : pathForBreadcrumb
+                    const pathSegments = cleanPath.split("/").filter(Boolean)
+
+                    return pathSegments.map((segment, index) => (
+                      <React.Fragment key={index}>
+                        <BreadcrumbSeparator> / </BreadcrumbSeparator>
+                        <BreadcrumbItem>
+                          {index === pathSegments.length - 1 ? (
+                            <BreadcrumbPage>{segment}</BreadcrumbPage>
+                          ) : (
+                            <span className="text-muted-foreground">
+                              {segment}
+                            </span>
+                          )}
+                        </BreadcrumbItem>
+                      </React.Fragment>
+                    ))
+                  })()}
                 </>
               )}
             </BreadcrumbList>

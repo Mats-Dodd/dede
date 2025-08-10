@@ -48,3 +48,39 @@ export function useFileNode(fileId: string) {
 
   return { node, setTitle, setContent }
 }
+
+export function useFileNodeByPath(filePath: string) {
+  const { data } = useLiveQuery((q) =>
+    q
+      .from({ n: fileSystemNodeCollection })
+      .where(({ n }) => eq(n.path, filePath))
+  )
+  const node = data?.[0]
+
+  // updater helper
+  const updateImmediate = useCallback(
+    (patch: Partial<typeof node>) => {
+      if (!node) return
+      fileSystemNodeCollection.update(node.id.toString(), (draft) => {
+        Object.assign(draft, patch)
+        draft.updatedAt = new Date()
+      })
+    },
+    [node]
+  )
+
+  const debouncedUpdateTitle = useRef(
+    debounce((t: string) => updateImmediate({ title: t }), 300)
+  ).current
+
+  const setTitle = useCallback(
+    (t: string) => debouncedUpdateTitle(t),
+    [debouncedUpdateTitle]
+  )
+  const setContent = useCallback(
+    (html: string) => updateImmediate({ content: html }),
+    [updateImmediate]
+  )
+
+  return { node, setTitle, setContent }
+}

@@ -1,43 +1,48 @@
 import { useFileNodeByPath } from "@/lib/hooks/use-file-node"
-import { useRef, useEffect, useState } from "react"
-import { LoroDoc } from "loro-crdt"
+import { useRef, useEffect, useCallback } from "react"
+// LoroDoc type imported via hook return; no direct import needed here
 import { TabsContent } from "@/components/ui/tabs"
 import Tiptap from "@/components/editor"
+import { base64ToBytes, bytesToBase64, loroExportSnapshot } from "@/types/crdt"
+import type { Base64String } from "@/types/crdt"
 import {
-  base64ToBytes,
-  bytesToBase64,
-  loroExportSnapshot,
-  loroExportUpdate,
-} from "@/types/crdt"
-import type { Base64String, LoroVersion } from "@/types/crdt"
+  useSharedLoroDoc,
+  beginRemoteApply,
+  endRemoteApply,
+  isRemoteApplying,
+  setDocLastSavedBase64,
+  getDocLastSavedBase64,
+} from "@/lib/loro-doc-registry"
 export default function FileEditorPane({
   filePath,
 }: {
   filePath: string
   key?: string
 }) {
-  const { node, setTitle, setMetadata, setContentCRDT } =
-    useFileNodeByPath(filePath)
-  const [loroDoc, setLoroDoc] = useState<LoroDoc | null>(null)
+  const { node, setTitle, setContentCRDT } = useFileNodeByPath(filePath)
+  const loroDoc = useSharedLoroDoc(filePath)
   const lastSavedRef = useRef<Base64String | null>(null)
-  const lastVersionRef = useRef<LoroVersion | null>(null)
-  const lastImportedUpdateHashRef = useRef<string | null>(null)
-  const hasImportedSnapshotRef = useRef<boolean>(false)
-  const importedSnapshotVersionRef = useRef<LoroVersion | null>(null)
-
-  // Initialize LoroDoc instance for this pane
-  useEffect(() => {
-    if (!loroDoc) {
-      const d = new LoroDoc()
-      setLoroDoc(d)
-      try {
-        lastVersionRef.current = d.version()
-      } catch (_e) {
-        void _e
+  const snapshotTimeoutRef = useRef<number | null>(null)
+  const flushSnapshot = useCallback(() => {
+    if (!loroDoc || !node) return
+    try {
+      const snapBytes = loroExportSnapshot(loroDoc)
+      const snapBase64 = bytesToBase64(snapBytes)
+      if (snapBase64 !== lastSavedRef.current) {
+        setContentCRDT(snapBase64)
+        lastSavedRef.current = snapBase64
+        console.log("[Loro] Snapshot flushed", {
+          filePath,
+          nodeId: node.id,
+          bytesLength: snapBytes.length,
+        })
       }
-      console.log("[Loro] Created LoroDoc", { filePath })
+    } catch (e) {
+      console.warn("[Loro] Snapshot flush failed", e)
     }
-  }, [loroDoc, filePath])
+  }, [loroDoc, node, setContentCRDT, filePath])
+
+  // loroDoc is provided by shared registry
 
   // Log node changes for debugging
   useEffect(() => {
@@ -60,85 +65,38 @@ export default function FileEditorPane({
     if (base64 === lastSavedRef.current) return
     try {
       const bytes = base64ToBytes(base64)
-      const verBefore = (() => {
-        try {
-          return loroDoc.version()
-        } catch {
-          return null
-        }
-      })()
-      console.log("[Loro] Importing snapshot from DB", {
+      // Guard to prevent echo exports triggered by imports
+      beginRemoteApply(filePath)
+      loroDoc.import(bytes)
+      endRemoteApply(filePath)
+      lastSavedRef.current = base64
+      setDocLastSavedBase64(filePath, base64)
+      console.log("[Loro] Snapshot import complete", {
         filePath,
         nodeId: node.id,
-        base64Length: base64.length,
         bytesLength: bytes.length,
-        verBefore,
       })
-      loroDoc.import(bytes)
-      try {
-        const verAfter = loroDoc.version()
-        lastVersionRef.current = verAfter
-        hasImportedSnapshotRef.current = true
-        importedSnapshotVersionRef.current =
-          node.metadata?.loroVersion ?? verAfter
-        console.log("[Loro] Snapshot import complete", { verAfter })
-      } catch (_e) {
-        void _e
-      }
     } catch (e) {
       console.warn("[Loro] Import failed", e)
     }
   }, [node?.id, node?.contentCRDT, loroDoc, filePath])
 
-  // Import remote incremental update if present
+  // Cleanup pending snapshot timer on unmount and flush snapshot
   useEffect(() => {
-    if (!node || !loroDoc) return
-    const meta = node.metadata ?? {}
-    const updateBase64 = meta.loroUpdate as Base64String | undefined
-    const updateHash = meta.loroHash as string | undefined
-    const snapshotPresent = Boolean(node.contentCRDT)
-    if (!updateBase64 || updateBase64.length === 0) return
-    // Ensure we import snapshot first for consistent state
-    if (!snapshotPresent || !hasImportedSnapshotRef.current) return
-    if (updateHash && updateHash === lastImportedUpdateHashRef.current) return
-    try {
-      const bytes = base64ToBytes(updateBase64)
-      const verBefore = (() => {
-        try {
-          return loroDoc.version()
-        } catch {
-          return null
-        }
-      })()
-      console.log("[Loro] Importing incremental update from DB", {
-        filePath,
-        nodeId: node.id,
-        updateBytes: bytes.length,
-        updateHash,
-        verBefore,
-      })
-      loroDoc.import(bytes)
-      // Advance local trackers
-      try {
-        const verAfter = loroDoc.version()
-        lastVersionRef.current = verAfter
-        console.log("[Loro] Update import complete", { verAfter })
-      } catch (_e) {
-        void _e
+    const handleBeforeUnload = () => flushSnapshot()
+    const handlePageHide = () => flushSnapshot()
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    window.addEventListener("pagehide", handlePageHide)
+    return () => {
+      if (snapshotTimeoutRef.current) {
+        clearTimeout(snapshotTimeoutRef.current)
+        snapshotTimeoutRef.current = null
       }
-      if (updateHash) {
-        lastImportedUpdateHashRef.current = updateHash
-      }
-    } catch (e) {
-      console.warn("[Loro] Update import failed", e)
+      window.removeEventListener("beforeunload", handleBeforeUnload)
+      window.removeEventListener("pagehide", handlePageHide)
+      flushSnapshot()
     }
-  }, [
-    node?.id,
-    node?.metadata?.loroUpdate,
-    node?.metadata?.loroHash,
-    loroDoc,
-    filePath,
-  ])
+  }, [flushSnapshot])
 
   if (!node) return null
 
@@ -150,89 +108,46 @@ export default function FileEditorPane({
         onTitleChange={setTitle}
         onDirty={() => {
           if (!loroDoc) return
-          const from = lastVersionRef.current
-          const toVersion = (() => {
-            try {
-              return loroDoc.version()
-            } catch {
-              return null
-            }
-          })()
-          console.log("[Loro] Preparing export", { from, toVersion })
+          if (isRemoteApplying(filePath)) return
 
-          // If we have no persisted snapshot yet, take one now to make reload durable
-          const currentSnapshotBase64 = node?.contentCRDT as Base64String | null
-          if (!currentSnapshotBase64 || currentSnapshotBase64.length === 0) {
-            const snapBytes = loroExportSnapshot(loroDoc)
-            const snapBase64 = bytesToBase64(snapBytes)
-            console.log("[Loro] Initial snapshot -> persisting contentCRDT", {
-              filePath,
-              nodeId: node.id,
-              bytesLength: snapBytes.length,
-            })
-            setContentCRDT(snapBase64)
-            // After snapshot export, record local version for subsequent updates
-            try {
-              importedSnapshotVersionRef.current = loroDoc.version()
-            } catch (_e) {
-              void _e
-            }
-            hasImportedSnapshotRef.current = true
-            lastSavedRef.current = snapBase64
-            lastVersionRef.current =
-              importedSnapshotVersionRef.current ?? lastVersionRef.current
-            return
+          if (snapshotTimeoutRef.current) {
+            clearTimeout(snapshotTimeoutRef.current)
           }
-
-          // Export cumulative updates from the locally recorded snapshot version (do not use JSON-ified versions)
-          let updateBytes: Uint8Array | undefined
-          try {
-            updateBytes = importedSnapshotVersionRef.current
-              ? loroExportUpdate(loroDoc, importedSnapshotVersionRef.current)
-              : loroExportUpdate(loroDoc)
-          } catch (e) {
-            console.warn(
-              "[Loro] Update export failed, falling back to snapshot",
-              e
-            )
-            try {
-              const snapBytes = loroExportSnapshot(loroDoc)
-              const snapBase64 = bytesToBase64(snapBytes)
-              setContentCRDT(snapBase64)
-              try {
-                importedSnapshotVersionRef.current = loroDoc.version()
-              } catch (_e) {
-                void _e
+          snapshotTimeoutRef.current = window.setTimeout(() => {
+            // Optionally defer heavy work to idle time
+            const run = (fn: () => void) => {
+              const ric = window.requestIdleCallback as
+                | ((cb: () => void, opts?: { timeout?: number }) => number)
+                | undefined
+              if (ric) {
+                ric(fn, { timeout: 500 })
+              } else {
+                // Fallback
+                setTimeout(fn, 0)
               }
-              hasImportedSnapshotRef.current = true
-              lastSavedRef.current = snapBase64
-              lastVersionRef.current =
-                importedSnapshotVersionRef.current ?? lastVersionRef.current
-              return
-            } catch (e2) {
-              console.warn("[Loro] Snapshot export also failed", e2)
-              return
             }
-          }
-          if (updateBytes && updateBytes.length > 0) {
-            const updateBase64 = bytesToBase64(updateBytes)
-            const updateHash = `${updateBase64.length}:${updateBase64.slice(0, 8)}:${updateBase64.slice(-8)}`
-            console.log("[Loro] onDirty -> exporting update", {
-              filePath,
-              nodeId: node.id,
-              from: importedSnapshotVersionRef.current,
-              to: toVersion,
-              updateBytes: updateBytes.length,
+
+            run(() => {
+              try {
+                const snapBytes = loroExportSnapshot(loroDoc)
+                const snapBase64 = bytesToBase64(snapBytes)
+                const lastSaved =
+                  lastSavedRef.current ?? getDocLastSavedBase64(filePath)
+                if (snapBase64 !== lastSaved) {
+                  setContentCRDT(snapBase64)
+                  lastSavedRef.current = snapBase64
+                  setDocLastSavedBase64(filePath, snapBase64)
+                  console.log("[Loro] Snapshot exported", {
+                    filePath,
+                    nodeId: node.id,
+                    bytesLength: snapBytes.length,
+                  })
+                }
+              } catch (e) {
+                console.warn("[Loro] Snapshot export failed", e)
+              }
             })
-            setMetadata({
-              loroUpdate: updateBase64,
-              loroUpdateToVersion: toVersion,
-              loroHash: updateHash,
-            })
-            lastVersionRef.current = toVersion ?? lastVersionRef.current
-          } else {
-            console.log("[Loro] No update bytes to export", { from, toVersion })
-          }
+          }, 300)
         }}
       />
     </TabsContent>

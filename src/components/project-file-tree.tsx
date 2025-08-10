@@ -424,7 +424,7 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     <>
       <div className="flex flex-col h-full">
         <div className="flex items-center justify-between px-2 pb-2">
-          <h3 className="text-sm font-medium">Files</h3>
+          <h3 className="text-sm font-medium"></h3>
           <div className="flex gap-1">
             <Button
               variant="ghost"

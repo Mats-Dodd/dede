@@ -1,7 +1,7 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useFileContext } from "@/lib/file-context"
 import FileEditorPane from "@/components/file-editor-pane"
-import { useCallback } from "react"
+import { useCallback, useState } from "react"
 import { X } from "lucide-react"
 import {
   useMacKeyboardShortcuts,
@@ -10,12 +10,21 @@ import {
 import { useTabNavigation } from "@/lib/hooks/use-tab-navigation"
 
 export default function TabManager() {
-  const { openFiles, activeFilePath, setActiveFile, closeFile } =
-    useFileContext()
+  const {
+    openFiles,
+    activeFilePath,
+    setActiveFile,
+    closeFile,
+    reorderOpenFiles,
+  } = useFileContext()
 
   // Tab navigation actions
   const { goToNextTab, goToPreviousTab, goToTabByIndex, goToLastTab } =
     useTabNavigation()
+
+  // Drag and drop state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
   // Mac-optimized keyboard shortcuts for tab navigation
   useMacKeyboardShortcuts([
@@ -57,6 +66,51 @@ export default function TabManager() {
     [closeFile]
   )
 
+  // Drag and drop handlers
+  const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
+    setDraggedIndex(index)
+    e.dataTransfer.effectAllowed = "move"
+    e.dataTransfer.setData("text/html", e.currentTarget.outerHTML)
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = "move"
+    setDragOverIndex(index)
+  }, [])
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+  }, [])
+
+  const handleDragLeave = useCallback(
+    (e: React.DragEvent, index: number) => {
+      if (dragOverIndex === index) {
+        setDragOverIndex(null)
+      }
+    },
+    [dragOverIndex]
+  )
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent, dropIndex: number) => {
+      e.preventDefault()
+
+      if (draggedIndex !== null && draggedIndex !== dropIndex) {
+        reorderOpenFiles(draggedIndex, dropIndex)
+      }
+
+      setDraggedIndex(null)
+      setDragOverIndex(null)
+    },
+    [draggedIndex, reorderOpenFiles]
+  )
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+  }, [])
+
   if (deduplicatedOpenFiles.length === 0) {
     return (
       <div className="h-full flex items-center justify-center p-4">
@@ -81,12 +135,28 @@ export default function TabManager() {
         className="flex-1 flex flex-col"
       >
         <TabsList className="shrink-0">
-          {deduplicatedOpenFiles.map((file) => {
+          {deduplicatedOpenFiles.map((file, index) => {
             const filePath = file.fileSystemNode.path
             const fileName = file.fileSystemNode.title || "Untitled"
+            const isDragging = draggedIndex === index
+            const isDragOver = dragOverIndex === index
 
             return (
-              <div key={`tab-${filePath}`} className="relative group">
+              <div
+                key={`tab-${filePath}`}
+                className={`relative group transition-all duration-150 ${
+                  isDragging
+                    ? "opacity-50 cursor-grabbing scale-105"
+                    : "cursor-grab"
+                } ${isDragOver ? "border-l-4 border-blue-500 pl-1" : ""}`}
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragEnter={handleDragEnter}
+                onDragLeave={(e) => handleDragLeave(e, index)}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={handleDragEnd}
+              >
                 <TabsTrigger value={filePath} className="pr-8 max-w-48">
                   <span className="truncate">{fileName}</span>
                 </TabsTrigger>

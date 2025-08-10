@@ -15,6 +15,7 @@ interface FileContextType {
   openFile: (node: FileTreeNode) => void
   closeFile: (filePath: string) => void
   setActiveFile: (filePath: string) => void
+  reorderOpenFiles: (fromIndex: number, toIndex: number) => void
   updateOpenFilePaths: (
     oldPath: string,
     newPath: string,
@@ -89,6 +90,22 @@ export function FileProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const reorderOpenFiles = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (fromIndex === toIndex) return
+      if (fromIndex < 0 || toIndex < 0) return
+      if (fromIndex >= openFiles.length || toIndex >= openFiles.length) return
+
+      setOpenFiles((prev) => {
+        const newFiles = [...prev]
+        const [movedFile] = newFiles.splice(fromIndex, 1)
+        newFiles.splice(toIndex, 0, movedFile)
+        return newFiles
+      })
+    },
+    [openFiles.length]
+  )
+
   const updateOpenFilePaths = useCallback(
     (oldPath: string, newPath: string, isDirectory: boolean) => {
       setOpenFiles((prev) => {
@@ -155,6 +172,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
         openFile,
         closeFile,
         setActiveFile,
+        reorderOpenFiles,
         updateOpenFilePaths,
       }}
     >

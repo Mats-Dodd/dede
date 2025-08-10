@@ -11,15 +11,15 @@ import {
 import { useFileContext } from "@/lib/file-context"
 import { type FileSystemNode } from "@/db/schema"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import { FolderPlusIcon, FilePlusIcon, TrashIcon, EditIcon } from "lucide-react"
+  FolderPlusIcon,
+  FilePlusIcon,
+  TrashIcon,
+  EditIcon,
+  FolderIcon,
+  FolderOpenIcon,
+  FileIcon,
+} from "lucide-react"
 import {
   joinPaths,
   updateNodePath,
@@ -35,24 +35,8 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
   const { selectedFileNode, setSelectedFileNode, updateOpenFilePaths } =
     useFileContext()
   const [lastCreatedPath, setLastCreatedPath] = useState<string | undefined>()
-  const [dialogState, setDialogState] = useState<{
-    open: boolean
-    type: "file" | "directory"
-    parentPath: string
-    name: string
-    isCreating: boolean
-  }>({
-    open: false,
-    type: "file",
-    parentPath: "/",
-    name: "",
-    isCreating: false,
-  })
-  const [editDialog, setEditDialog] = useState<{
-    open: boolean
-    node: FileSystemNode | null
-  }>({ open: false, node: null })
-  const [editForm, setEditForm] = useState({ name: "", content: "" })
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
+  const [ghostNodes, setGhostNodes] = useState<FileTreeNode[]>([])
   const [contextMenu, setContextMenu] = useState<{
     open: boolean
     x: number
@@ -96,8 +80,46 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
 
   const treeData = useMemo(() => {
     const tree = transformFileSystemNodesToTree(fileSystemNodes)
-    return tree
-  }, [fileSystemNodes])
+    // Merge ghost nodes into the tree
+    const mergedTree = [...tree]
+
+    ghostNodes.forEach((ghostNode) => {
+      // Find parent directory or add to root
+      const parentPath = ghostNode.path.substring(
+        0,
+        ghostNode.path.lastIndexOf("/")
+      )
+
+      if (!parentPath || parentPath === "") {
+        // Add to root
+        mergedTree.push(ghostNode)
+      } else {
+        // Find parent and add as child
+        const findAndAddToParent = (nodes: FileTreeNode[]): boolean => {
+          for (const node of nodes) {
+            if (node.path === parentPath && node.type === "directory") {
+              if (!node.children) node.children = []
+              node.children.push(ghostNode)
+              return true
+            }
+            if (node.children) {
+              if (findAndAddToParent(node.children as FileTreeNode[])) {
+                return true
+              }
+            }
+          }
+          return false
+        }
+
+        if (!findAndAddToParent(mergedTree)) {
+          // If parent not found, add to root anyway
+          mergedTree.push(ghostNode)
+        }
+      }
+    })
+
+    return mergedTree
+  }, [fileSystemNodes, ghostNodes])
 
   const handleNodeSelect = (item: TreeDataItem | undefined) => {
     if (item && "fileSystemNode" in item) {
@@ -163,34 +185,35 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     toast.success(`📁 Moved '${fileName}' to root`)
   }
 
-  const resetDialog = () => {
-    setDialogState({
-      open: false,
-      type: "file",
-      parentPath: "/",
-      name: "",
-      isCreating: false,
-    })
-  }
-
-  const handleCreateItem = async () => {
-    if (!dialogState.name.trim() || !project || dialogState.isCreating) return
-
-    setDialogState((prev) => ({ ...prev, isCreating: true }))
+  const handleCreateNewItem = async (
+    type: "file" | "directory",
+    parentPath: string,
+    name: string
+  ) => {
+    if (!name.trim() || !project) return
 
     try {
       const fullPath =
-        dialogState.parentPath === "/"
-          ? `/${dialogState.name.trim()}`
-          : `${dialogState.parentPath}/${dialogState.name.trim()}`
+        parentPath === "/" ? `/${name.trim()}` : `${parentPath}/${name.trim()}`
+
+      // Check if item already exists
+      const existing = fileSystemNodes.find(
+        (node) => node.path === fullPath && !node.isDeleted
+      )
+      if (existing) {
+        toast.error(
+          `${type === "directory" ? "Folder" : "File"} '${name.trim()}' already exists`
+        )
+        return
+      }
 
       // Insert with temporary ID - Electric will sync back real ID
       await fileSystemNodeCollection.insert({
         id: Math.floor(Math.random() * 100000), // Temporary ID required
         projectId,
         path: fullPath,
-        title: dialogState.name.trim(),
-        type: dialogState.type,
+        title: name.trim(),
+        type,
         content: null,
         metadata: {},
         isDeleted: false,
@@ -200,45 +223,38 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
       })
 
       toast.success(
-        `${dialogState.type === "directory" ? "📁 Folder" : "📄 File"} '${dialogState.name.trim()}' created`
+        `${type === "directory" ? "📁 Folder" : "📄 File"} '${name.trim()}' created`
       )
 
       // Set the path to auto-expand and select the newly created item
       setLastCreatedPath(fullPath)
-
-      resetDialog()
     } catch (error) {
       console.error("Creation error:", error)
-      toast.error(`Failed to create ${dialogState.type}`)
-      setDialogState((prev) => ({ ...prev, isCreating: false }))
+      toast.error(`Failed to create ${type}`)
     }
   }
 
-  const handleEdit = (node: FileSystemNode) => {
-    setEditDialog({ open: true, node })
-    setEditForm({
-      name: node.title,
-      content: node.content || "",
-    })
+  const handleStartEdit = (nodeId: string) => {
+    setEditingNodeId(nodeId)
   }
 
-  const handleSaveEdit = () => {
-    if (!editDialog.node || !editForm.name.trim()) return
+  const handleCompleteEdit = (node: FileSystemNode, newName: string) => {
+    if (!newName.trim() || newName === node.title) {
+      setEditingNodeId(null)
+      return
+    }
 
-    const node = editDialog.node
     const oldName = node.title
-    const newName = editForm.name.trim()
     const oldPath = node.path
     const newPath = node.path.replace(
       new RegExp(`/${node.title}$`),
-      `/${newName}`
+      `/${newName.trim()}`
     )
 
     // Update the current node
     fileSystemNodeCollection.update(node.id.toString(), (draft) => {
-      draft.title = newName
+      draft.title = newName.trim()
       draft.path = newPath
-      draft.content = editForm.content.trim() || null
       draft.updatedAt = new Date()
     })
 
@@ -250,14 +266,93 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     // Sync open tabs and active file path
     updateOpenFilePaths(oldPath, newPath, node.type === "directory")
 
-    if (oldName !== newName) {
-      toast.success(`✏️ '${oldName}' renamed to '${newName}'`)
-    } else {
-      toast.success(`💾 '${newName}' updated`)
+    toast.success(`✏️ '${oldName}' renamed to '${newName.trim()}'`)
+    setEditingNodeId(null)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingNodeId(null)
+  }
+
+  const createGhostNode = (type: "file" | "directory", parentPath: string) => {
+    const tempId = `ghost-${Date.now()}`
+    const ghostPath =
+      parentPath === "/" ? "/untitled" : `${parentPath}/untitled`
+
+    const ghostNode: FileTreeNode = {
+      id: tempId,
+      name: "",
+      path: ghostPath,
+      type,
+      fileSystemNode: {
+        id: -1,
+        projectId,
+        path: ghostPath,
+        title: "",
+        type,
+        content: null,
+        metadata: {},
+        isDeleted: false,
+        userIds: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      icon: type === "directory" ? FolderIcon : FileIcon,
+      openIcon: type === "directory" ? FolderOpenIcon : undefined,
+      selectedIcon: type === "directory" ? FolderOpenIcon : FileIcon,
+      children: type === "directory" ? [] : undefined,
+      draggable: false,
+      droppable: false,
+      isGhost: true,
+      isEditing: true,
     }
 
-    setEditDialog({ open: false, node: null })
-    setEditForm({ name: "", content: "" })
+    setGhostNodes((prev) => [...prev, ghostNode])
+    setEditingNodeId(tempId)
+  }
+
+  const handleGhostComplete = async (ghostId: string, newName: string) => {
+    const ghost = ghostNodes.find((g) => g.id === ghostId)
+    if (!ghost || !newName.trim()) {
+      // Cancel if no name provided
+      setGhostNodes((prev) => prev.filter((g) => g.id !== ghostId))
+      setEditingNodeId(null)
+      return
+    }
+
+    const parentPath = ghost.path.substring(0, ghost.path.lastIndexOf("/"))
+    const fullPath =
+      parentPath === ""
+        ? `/${newName.trim()}`
+        : `${parentPath}/${newName.trim()}`
+
+    // Check if item already exists
+    const existing = fileSystemNodes.find(
+      (node) => node.path === fullPath && !node.isDeleted
+    )
+    if (existing) {
+      toast.error(
+        `${ghost.type === "directory" ? "Folder" : "File"} '${newName.trim()}' already exists`
+      )
+      setGhostNodes((prev) => prev.filter((g) => g.id !== ghostId))
+      setEditingNodeId(null)
+      return
+    }
+
+    await handleCreateNewItem(
+      ghost.type,
+      parentPath === "" ? "/" : parentPath,
+      newName.trim()
+    )
+
+    // Remove ghost node after creation
+    setGhostNodes((prev) => prev.filter((g) => g.id !== ghostId))
+    setEditingNodeId(null)
+  }
+
+  const handleGhostCancel = (ghostId: string) => {
+    setGhostNodes((prev) => prev.filter((g) => g.id !== ghostId))
+    setEditingNodeId(null)
   }
 
   const handleDelete = (node: FileSystemNode) => {
@@ -284,14 +379,32 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     const addContextMenu = (nodes: FileTreeNode[]): TreeDataItem[] => {
       return nodes.map((node) => ({
         ...node,
+        isEditing: editingNodeId === node.id,
+        onStartEdit: () => handleStartEdit(node.id),
+        onCompleteEdit: (newName: string) => {
+          if (node.isGhost) {
+            handleGhostComplete(node.id, newName)
+          } else {
+            handleCompleteEdit(node.fileSystemNode, newName)
+          }
+        },
+        onCancelEdit: () => {
+          if (node.isGhost) {
+            handleGhostCancel(node.id)
+          } else {
+            handleCancelEdit()
+          }
+        },
         onContextMenu: (e: React.MouseEvent) => {
-          e.preventDefault()
-          setContextMenu({
-            open: true,
-            x: e.clientX,
-            y: e.clientY,
-            node: node,
-          })
+          if (!node.isGhost) {
+            e.preventDefault()
+            setContextMenu({
+              open: true,
+              x: e.clientX,
+              y: e.clientY,
+              node: node,
+            })
+          }
         },
         children: node.children
           ? addContextMenu(node.children as FileTreeNode[])
@@ -299,7 +412,7 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
       }))
     }
     return addContextMenu(treeData)
-  }, [treeData])
+  }, [treeData, editingNodeId, ghostNodes])
 
   if (!project) {
     return (
@@ -316,34 +429,16 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() =>
-                setDialogState({
-                  open: true,
-                  type: "file",
-                  parentPath: "/",
-                  name: "",
-                  isCreating: false,
-                })
-              }
+              onClick={() => createGhostNode("file", "/")}
               className="h-6 w-6 p-0"
-              disabled={dialogState.isCreating}
             >
               <FilePlusIcon className="h-3 w-3" />
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() =>
-                setDialogState({
-                  open: true,
-                  type: "directory",
-                  parentPath: "/",
-                  name: "",
-                  isCreating: false,
-                })
-              }
+              onClick={() => createGhostNode("directory", "/")}
               className="h-6 w-6 p-0"
-              disabled={dialogState.isCreating}
             >
               <FolderPlusIcon className="h-3 w-3" />
             </Button>
@@ -359,6 +454,12 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
               onSelectChange={handleNodeSelect}
               onDocumentDrag={handleDocumentDrag}
               onRootDrop={handleRootDrop}
+              onRenameShortcut={(item) => {
+                if ("fileSystemNode" in item) {
+                  const fileNode = item as FileTreeNode
+                  handleStartEdit(fileNode.id)
+                }
+              }}
               className="min-h-[200px]"
             />
             {lastCreatedPath && (
@@ -398,101 +499,6 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
         )}
       </div>
 
-      {/* New Item Dialog */}
-      <Dialog
-        open={dialogState.open}
-        onOpenChange={(open) => {
-          if (!open) {
-            resetDialog()
-          } else {
-            setDialogState((prev) => ({ ...prev, open }))
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              Create New {dialogState.type === "file" ? "File" : "Folder"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Name</label>
-              <Input
-                value={dialogState.name}
-                onChange={(e) =>
-                  setDialogState((prev) => ({ ...prev, name: e.target.value }))
-                }
-                placeholder={`${dialogState.type === "file" ? "file" : "folder"}.${dialogState.type === "file" ? "txt" : ""}`}
-                onKeyDown={(e) => e.key === "Enter" && handleCreateItem()}
-              />
-            </div>
-            <div className="text-sm text-muted-foreground">
-              Location: {dialogState.parentPath}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={resetDialog}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleCreateItem}
-              disabled={dialogState.isCreating}
-            >
-              {dialogState.isCreating ? "Creating..." : "Create"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Dialog */}
-      <Dialog
-        open={editDialog.open}
-        onOpenChange={(open) => setEditDialog({ ...editDialog, open })}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              Edit {editDialog.node?.type === "file" ? "File" : "Folder"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Name</label>
-              <Input
-                value={editForm.name}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, name: e.target.value })
-                }
-                onKeyDown={(e) => e.key === "Enter" && handleSaveEdit()}
-              />
-            </div>
-            {editDialog.node?.type === "file" && (
-              <div>
-                <label className="text-sm font-medium">Content</label>
-                <textarea
-                  value={editForm.content}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, content: e.target.value })
-                  }
-                  className="w-full h-32 px-3 py-2 border border-gray-300 rounded-md text-sm"
-                  placeholder="File content..."
-                />
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEditDialog({ open: false, node: null })}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleSaveEdit}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Context Menu */}
       {contextMenu.open && (
         <div
@@ -510,38 +516,26 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
               <div className="space-y-1">
                 <button
                   onClick={() => {
-                    setDialogState({
-                      open: true,
-                      type: "file",
-                      parentPath: contextMenu.node
-                        ? contextMenu.node.path
-                        : "/",
-                      name: "",
-                      isCreating: false,
-                    })
+                    const parentPath = contextMenu.node
+                      ? contextMenu.node.path
+                      : "/"
+                    createGhostNode("file", parentPath)
                     setContextMenu({ open: false, x: 0, y: 0, node: null })
                   }}
                   className="flex items-center gap-2 w-full px-2 py-1.5 text-sm hover:bg-gray-100 rounded"
-                  disabled={dialogState.isCreating}
                 >
                   <FilePlusIcon className="h-4 w-4" />
                   New File
                 </button>
                 <button
                   onClick={() => {
-                    setDialogState({
-                      open: true,
-                      type: "directory",
-                      parentPath: contextMenu.node
-                        ? contextMenu.node.path
-                        : "/",
-                      name: "",
-                      isCreating: false,
-                    })
+                    const parentPath = contextMenu.node
+                      ? contextMenu.node.path
+                      : "/"
+                    createGhostNode("directory", parentPath)
                     setContextMenu({ open: false, x: 0, y: 0, node: null })
                   }}
                   className="flex items-center gap-2 w-full px-2 py-1.5 text-sm hover:bg-gray-100 rounded"
-                  disabled={dialogState.isCreating}
                 >
                   <FolderPlusIcon className="h-4 w-4" />
                   New Folder
@@ -550,7 +544,7 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
                   <>
                     <button
                       onClick={() => {
-                        handleEdit(contextMenu.node!.fileSystemNode)
+                        handleStartEdit(contextMenu.node!.id)
                         setContextMenu({ open: false, x: 0, y: 0, node: null })
                       }}
                       className="flex items-center gap-2 w-full px-2 py-1.5 text-sm hover:bg-gray-100 rounded"
@@ -575,7 +569,7 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
               <div className="space-y-1">
                 <button
                   onClick={() => {
-                    handleEdit(contextMenu.node!.fileSystemNode)
+                    handleStartEdit(contextMenu.node!.id)
                     setContextMenu({ open: false, x: 0, y: 0, node: null })
                   }}
                   className="flex items-center gap-2 w-full px-2 py-1.5 text-sm hover:bg-gray-100 rounded"

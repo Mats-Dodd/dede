@@ -28,6 +28,11 @@ interface TreeDataItem {
   draggable?: boolean
   droppable?: boolean
   disabled?: boolean
+  isEditing?: boolean
+  isGhost?: boolean
+  onStartEdit?: () => void
+  onCompleteEdit?: (newName: string) => void
+  onCancelEdit?: () => void
 }
 
 type TreeProps = React.HTMLAttributes<HTMLDivElement> & {
@@ -40,6 +45,7 @@ type TreeProps = React.HTMLAttributes<HTMLDivElement> & {
   defaultLeafIcon?: React.ComponentType<{ className?: string }>
   onDocumentDrag?: (sourceItem: TreeDataItem, targetItem: TreeDataItem) => void
   onRootDrop?: (item: TreeDataItem) => void
+  onRenameShortcut?: (item: TreeDataItem) => void
 }
 
 const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
@@ -55,6 +61,7 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
       className,
       onDocumentDrag,
       onRootDrop,
+      onRenameShortcut,
       ...props
     },
     ref
@@ -119,12 +126,18 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
     const handleSelectChange = React.useCallback(
       (item: TreeDataItem | undefined) => {
         setSelectedItemId(item?.id)
+        setSelectedItem(item)
         if (onSelectChange) {
           onSelectChange(item)
         }
       },
       [onSelectChange]
     )
+
+    // Keep track of the selected item for F2 shortcut
+    const [selectedItem, setSelectedItem] = React.useState<
+      TreeDataItem | undefined
+    >()
 
     const handleDragStart = React.useCallback((item: TreeDataItem) => {
       setDraggedItem(item)
@@ -171,6 +184,24 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
       walkTreeItems(data, targetId)
       return ids
     }, [data, expandAll, initialId, selectedItemId])
+
+    // Handle F2 key for rename
+    React.useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (
+          e.key === "F2" &&
+          selectedItem &&
+          onRenameShortcut &&
+          !selectedItem.isEditing
+        ) {
+          e.preventDefault()
+          onRenameShortcut(selectedItem)
+        }
+      }
+
+      window.addEventListener("keydown", handleKeyDown)
+      return () => window.removeEventListener("keydown", handleKeyDown)
+    }, [selectedItem, onRenameShortcut])
 
     return (
       <div className={cn("overflow-hidden relative p-2", className)}>
@@ -304,6 +335,21 @@ const TreeNode = ({
   const [isDragOver, setIsDragOver] = React.useState(false)
   const [isDragging, setIsDragging] = React.useState(false)
   const [justDropped, setJustDropped] = React.useState(false)
+  const [editValue, setEditValue] = React.useState(item.name)
+  const inputRef = React.useRef<HTMLInputElement>(null)
+
+  React.useEffect(() => {
+    if (item.isEditing && inputRef.current) {
+      inputRef.current.focus()
+      if (!item.isGhost && item.name) {
+        inputRef.current.select()
+      }
+    }
+  }, [item.isEditing, item.isGhost, item.name])
+
+  React.useEffect(() => {
+    setEditValue(item.name)
+  }, [item.name])
 
   // Sync accordion state when expandedItemIds changes
   React.useEffect(() => {
@@ -398,7 +444,36 @@ const TreeNode = ({
             isOpen={value.includes(item.id)}
             default={defaultNodeIcon}
           />
-          <span className="text-sm truncate">{item.name}</span>
+          {item.isEditing ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation()
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  item.onCompleteEdit?.(editValue)
+                } else if (e.key === "Escape") {
+                  e.preventDefault()
+                  setEditValue(item.name)
+                  item.onCancelEdit?.()
+                }
+              }}
+              onBlur={() => {
+                if (editValue !== item.name) {
+                  item.onCompleteEdit?.(editValue)
+                } else {
+                  item.onCancelEdit?.()
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-grow text-sm bg-transparent border border-accent/50 rounded px-1 outline-none focus:border-accent"
+            />
+          ) : (
+            <span className="text-sm truncate">{item.name}</span>
+          )}
           <TreeActions isSelected={selectedItemId === item.id}>
             {item.actions}
           </TreeActions>
@@ -450,6 +525,28 @@ const TreeLeaf = React.forwardRef<
     const [isDragOver, setIsDragOver] = React.useState(false)
     const [isDragging, setIsDragging] = React.useState(false)
     const [justDropped, setJustDropped] = React.useState(false)
+    const [editValue, setEditValue] = React.useState(item.name)
+    const inputRef = React.useRef<HTMLInputElement>(null)
+
+    React.useEffect(() => {
+      if (item.isEditing && inputRef.current) {
+        inputRef.current.focus()
+        // For ghost nodes, just focus without selection
+        // For existing files, select filename without extension
+        if (!item.isGhost && item.name) {
+          const lastDotIndex = item.name.lastIndexOf(".")
+          if (lastDotIndex > 0) {
+            inputRef.current.setSelectionRange(0, lastDotIndex)
+          } else {
+            inputRef.current.select()
+          }
+        }
+      }
+    }, [item.isEditing, item.name, item.isGhost])
+
+    React.useEffect(() => {
+      setEditValue(item.name)
+    }, [item.name])
 
     const onDragStart = (e: React.DragEvent) => {
       if (!item.draggable || item.disabled) {
@@ -543,7 +640,36 @@ const TreeLeaf = React.forwardRef<
           isSelected={selectedItemId === item.id}
           default={defaultLeafIcon}
         />
-        <span className="flex-grow text-sm truncate">{item.name}</span>
+        {item.isEditing ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === "Enter") {
+                e.preventDefault()
+                item.onCompleteEdit?.(editValue)
+              } else if (e.key === "Escape") {
+                e.preventDefault()
+                setEditValue(item.name)
+                item.onCancelEdit?.()
+              }
+            }}
+            onBlur={() => {
+              if (editValue !== item.name) {
+                item.onCompleteEdit?.(editValue)
+              } else {
+                item.onCancelEdit?.()
+              }
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="flex-grow text-sm bg-transparent border border-accent/50 rounded px-1 outline-none focus:border-accent"
+          />
+        ) : (
+          <span className="flex-grow text-sm truncate">{item.name}</span>
+        )}
         <TreeActions isSelected={selectedItemId === item.id && !item.disabled}>
           {item.actions}
         </TreeActions>

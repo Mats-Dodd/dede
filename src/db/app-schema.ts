@@ -48,6 +48,7 @@ export const fileSystemNodes = pgTable("fileSystemNodes", {
   type: varchar("type", { length: 20 }).notNull(),
   title: varchar("title", { length: 500 }).notNull(),
   content: text("content"),
+  contentCRDT: text("contentCRDT"),
   metadata: jsonb("metadata")
     .$type<{
       language?: string

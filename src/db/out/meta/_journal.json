@@ -43,6 +43,13 @@
       "when": 1753653689628,
       "tag": "0005_talented_senator_kelly",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1754807160954,
+      "tag": "0006_glorious_satana",
+      "breakpoints": true
     }
   ]
 }

@@ -180,6 +180,7 @@ export const fileSystemNodeCollection = createCollection(
           title: updatedFileSystemNode.title,
           path: updatedFileSystemNode.path,
           type: updatedFileSystemNode.type,
+          contentCRDT: updatedFileSystemNode.contentCRDT,
         },
       })
 

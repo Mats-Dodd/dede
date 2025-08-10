@@ -3,9 +3,13 @@ import {
   useContext,
   useState,
   useCallback,
+  useEffect,
   type ReactNode,
 } from "react"
+import { useParams } from "@tanstack/react-router"
 import { type FileTreeNode } from "@/lib/utils/file-tree-utils"
+import { useSessionState } from "@/lib/hooks/use-session-state"
+import { useValidateAndRestoreFiles } from "@/lib/session-state-utils"
 
 interface FileContextType {
   selectedFileNode: FileTreeNode | undefined
@@ -26,11 +30,104 @@ interface FileContextType {
 const FileContext = createContext<FileContextType | null>(null)
 
 export function FileProvider({ children }: { children: ReactNode }) {
+  // Get project ID from route params
+  const params = useParams({ strict: false }) as { projectId?: string }
+  const projectId = params?.projectId
+  const numericProjectId: number | undefined =
+    projectId !== undefined ? Number(projectId) : undefined
+
+  // Session state management
+  const { currentState, saveSessionState } = useSessionState(
+    numericProjectId || 0
+  )
+  const { validateAndRestoreFiles, availableFiles } =
+    useValidateAndRestoreFiles(
+      currentState?.openFileIds || [],
+      numericProjectId || 0
+    )
+
   const [selectedFileNode, setSelectedFileNode] = useState<
     FileTreeNode | undefined
   >()
   const [openFiles, setOpenFiles] = useState<FileTreeNode[]>([])
   const [activeFilePath, setActiveFilePath] = useState<string | undefined>()
+  const [isRestoringSession, setIsRestoringSession] = useState(false)
+  const [hasRestoredOnce, setHasRestoredOnce] = useState(false)
+
+  // Reset restoration flag when project changes
+  useEffect(() => {
+    setHasRestoredOnce(false)
+  }, [numericProjectId])
+
+  // Restore session state on mount (only once per project)
+  useEffect(() => {
+    if (
+      currentState &&
+      currentState.openFileIds &&
+      currentState.openFileIds.length > 0 &&
+      numericProjectId &&
+      !isRestoringSession &&
+      !hasRestoredOnce &&
+      availableFiles &&
+      availableFiles.length > 0
+    ) {
+      setIsRestoringSession(true)
+
+      const fileIdsToRestore =
+        currentState.tabOrder && currentState.tabOrder.length > 0
+          ? currentState.tabOrder
+          : currentState.openFileIds
+
+      const restoredFiles = validateAndRestoreFiles(fileIdsToRestore)
+
+      if (restoredFiles.length > 0) {
+        setOpenFiles(restoredFiles)
+
+        // Restore active file if it still exists
+        if (
+          currentState.activeFilePath &&
+          restoredFiles.some(
+            (f) => f.fileSystemNode.path === currentState.activeFilePath
+          )
+        ) {
+          setActiveFilePath(currentState.activeFilePath)
+          const activeFile = restoredFiles.find(
+            (f) => f.fileSystemNode.path === currentState.activeFilePath
+          )
+          if (activeFile) {
+            setSelectedFileNode(activeFile)
+          }
+        }
+      }
+      setIsRestoringSession(false)
+      setHasRestoredOnce(true)
+    }
+  }, [currentState, numericProjectId, hasRestoredOnce, availableFiles])
+
+  // Save session state when openFiles or activeFilePath changes
+  useEffect(() => {
+    if (
+      numericProjectId &&
+      !isRestoringSession &&
+      hasRestoredOnce &&
+      (openFiles.length > 0 || activeFilePath)
+    ) {
+      const sessionData = {
+        openFileIds: openFiles.map((f) => f.fileSystemNode.id),
+        openFilePaths: openFiles.map((f) => f.fileSystemNode.path),
+        activeFilePath,
+        tabOrder: openFiles.map((f) => f.fileSystemNode.id),
+      }
+      saveSessionState(sessionData)
+    }
+  }, [
+    openFiles,
+    activeFilePath,
+    saveSessionState,
+    numericProjectId,
+    isRestoringSession,
+    hasRestoredOnce,
+  ])
 
   const openFile = (node: FileTreeNode) => {
     if (node.fileSystemNode.type !== "file") return
@@ -166,7 +263,9 @@ export function FileProvider({ children }: { children: ReactNode }) {
     <FileContext.Provider
       value={{
         selectedFileNode,
-        setSelectedFileNode: openFile, // Update legacy usage to open file
+        setSelectedFileNode: (node: FileTreeNode | undefined) => {
+          if (node) openFile(node)
+        },
         openFiles,
         activeFilePath,
         openFile,

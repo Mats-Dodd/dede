@@ -133,6 +133,14 @@ export const fileSystemNodeCollection = createCollection(
       ).toString(),
       params: {
         table: '"fileSystemNodes"',
+        columns: [
+          "id",
+          "title",
+          "path",
+          "updatedAt",
+          "contentCRDT",
+          "metadata",
+        ],
         user_id: async () =>
           authClient
             .getSession()
@@ -155,10 +163,12 @@ export const fileSystemNodeCollection = createCollection(
         json: {
           path: newFileSystemNode.path,
           content: newFileSystemNode.content,
+          contentCRDT: newFileSystemNode.contentCRDT,
           title: newFileSystemNode.title,
           type: newFileSystemNode.type,
           projectId: newFileSystemNode.projectId,
           userIds: newFileSystemNode.userIds,
+          metadata: newFileSystemNode.metadata,
         },
       })
 
@@ -181,6 +191,7 @@ export const fileSystemNodeCollection = createCollection(
           path: updatedFileSystemNode.path,
           type: updatedFileSystemNode.type,
           contentCRDT: updatedFileSystemNode.contentCRDT,
+          metadata: updatedFileSystemNode.metadata,
         },
       })
 

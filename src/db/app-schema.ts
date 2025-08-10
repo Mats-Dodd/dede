@@ -9,6 +9,19 @@ import {
 } from "drizzle-orm/pg-core"
 import { users } from "./auth-schema"
 import { relations } from "drizzle-orm"
+import type { Base64String, LoroVersion } from "@/types/crdt"
+
+export type FileSystemNodeMetadata = {
+  language?: string
+  encoding?: string
+  size?: number
+  isHidden?: boolean
+  // CRDT-related optional fields
+  loroUpdate?: Base64String
+  loroHash?: string
+  loroUpdateToVersion?: LoroVersion
+  [key: string]: unknown
+}
 
 export const projectsTable = pgTable(`projects`, {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -50,14 +63,8 @@ export const fileSystemNodes = pgTable("fileSystemNodes", {
   content: text("content"),
   contentCRDT: text("contentCRDT"),
   metadata: jsonb("metadata")
-    .$type<{
-      language?: string
-      encoding?: string
-      size?: number
-      isHidden?: boolean
-      [key: string]: unknown
-    }>()
-    .default({}),
+    .$type<FileSystemNodeMetadata>()
+    .default({} as FileSystemNodeMetadata),
   isDeleted: boolean("isDeleted").default(false).notNull(),
   userIds: text("userIds").array().notNull().default([]),
   createdAt: timestamp("createdAt", { withTimezone: true })

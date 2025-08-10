@@ -2,6 +2,8 @@ import { useCallback, useRef } from "react"
 import { useLiveQuery } from "@tanstack/react-db"
 import { eq } from "@tanstack/react-db"
 import { fileSystemNodeCollection } from "@/lib/collections"
+import type { FileSystemNode } from "@/db/schema"
+import type { Base64String } from "@/types/crdt"
 
 function debounce<Args extends unknown[]>(
   fn: (...args: Args) => void,
@@ -24,7 +26,7 @@ export function useFileNode(fileId: string) {
 
   // updater helper
   const updateImmediate = useCallback(
-    (patch: Partial<typeof node>) => {
+    (patch: Partial<FileSystemNode>) => {
       fileSystemNodeCollection.update(fileId, (draft) => {
         Object.assign(draft, patch)
         draft.updatedAt = new Date()
@@ -45,8 +47,22 @@ export function useFileNode(fileId: string) {
     (html: string) => updateImmediate({ content: html }),
     [updateImmediate]
   )
+  const setContentCRDT = useCallback(
+    (base64: Base64String) => updateImmediate({ contentCRDT: base64 }),
+    [updateImmediate]
+  )
+  const setMetadata = useCallback(
+    (meta: Partial<FileSystemNode["metadata"]>) =>
+      updateImmediate({
+        metadata: {
+          ...(node?.metadata ?? {}),
+          ...meta,
+        },
+      } as Partial<FileSystemNode>),
+    [updateImmediate, node]
+  )
 
-  return { node, setTitle, setContent }
+  return { node, setTitle, setContent, setContentCRDT, setMetadata }
 }
 
 export function useFileNodeByPath(filePath: string) {
@@ -59,7 +75,7 @@ export function useFileNodeByPath(filePath: string) {
 
   // updater helper
   const updateImmediate = useCallback(
-    (patch: Partial<typeof node>) => {
+    (patch: Partial<FileSystemNode>) => {
       if (!node) return
       fileSystemNodeCollection.update(node.id.toString(), (draft) => {
         Object.assign(draft, patch)
@@ -81,6 +97,20 @@ export function useFileNodeByPath(filePath: string) {
     (html: string) => updateImmediate({ content: html }),
     [updateImmediate]
   )
+  const setContentCRDT = useCallback(
+    (base64: Base64String) => updateImmediate({ contentCRDT: base64 }),
+    [updateImmediate]
+  )
+  const setMetadata = useCallback(
+    (meta: Partial<FileSystemNode["metadata"]>) =>
+      updateImmediate({
+        metadata: {
+          ...(node?.metadata ?? {}),
+          ...meta,
+        },
+      } as Partial<FileSystemNode>),
+    [updateImmediate, node]
+  )
 
-  return { node, setTitle, setContent }
+  return { node, setTitle, setContent, setContentCRDT, setMetadata }
 }

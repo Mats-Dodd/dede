@@ -112,12 +112,16 @@ export function FileProvider({ children }: { children: ReactNode }) {
           }
 
           if (updatedPath !== currentPath) {
+            // Extract the new filename from the new path
+            const newName = updatedPath.split("/").pop() || ""
             return {
               ...file,
+              name: newName,
               path: updatedPath,
               fileSystemNode: {
                 ...file.fileSystemNode,
                 path: updatedPath,
+                title: newName,
               },
             }
           }

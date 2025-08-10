@@ -1,7 +1,9 @@
-import { useCallback, useRef } from "react"
+import { useCallback, useMemo } from "react"
 import { useLiveQuery } from "@tanstack/react-db"
 import { eq } from "@tanstack/react-db"
 import { fileSystemNodeCollection } from "@/lib/collections"
+import type { FileSystemNode } from "@/db/schema"
+import type { Base64String } from "@/types/crdt"
 
 function debounce<Args extends unknown[]>(
   fn: (...args: Args) => void,
@@ -24,7 +26,7 @@ export function useFileNode(fileId: string) {
 
   // updater helper
   const updateImmediate = useCallback(
-    (patch: Partial<typeof node>) => {
+    (patch: Partial<FileSystemNode>) => {
       fileSystemNodeCollection.update(fileId, (draft) => {
         Object.assign(draft, patch)
         draft.updatedAt = new Date()
@@ -33,9 +35,10 @@ export function useFileNode(fileId: string) {
     [fileId]
   )
 
-  const debouncedUpdateTitle = useRef(
-    debounce((t: string) => updateImmediate({ title: t }), 300)
-  ).current
+  const debouncedUpdateTitle = useMemo(
+    () => debounce((t: string) => updateImmediate({ title: t }), 300),
+    [updateImmediate]
+  )
 
   const setTitle = useCallback(
     (t: string) => debouncedUpdateTitle(t),
@@ -45,8 +48,11 @@ export function useFileNode(fileId: string) {
     (html: string) => updateImmediate({ content: html }),
     [updateImmediate]
   )
-
-  return { node, setTitle, setContent }
+  const setContentCRDT = useCallback(
+    (base64: Base64String) => updateImmediate({ contentCRDT: base64 }),
+    [updateImmediate]
+  )
+  return { node, setTitle, setContent, setContentCRDT }
 }
 
 export function useFileNodeByPath(filePath: string) {
@@ -59,7 +65,7 @@ export function useFileNodeByPath(filePath: string) {
 
   // updater helper
   const updateImmediate = useCallback(
-    (patch: Partial<typeof node>) => {
+    (patch: Partial<FileSystemNode>) => {
       if (!node) return
       fileSystemNodeCollection.update(node.id.toString(), (draft) => {
         Object.assign(draft, patch)
@@ -69,9 +75,10 @@ export function useFileNodeByPath(filePath: string) {
     [node]
   )
 
-  const debouncedUpdateTitle = useRef(
-    debounce((t: string) => updateImmediate({ title: t }), 300)
-  ).current
+  const debouncedUpdateTitle = useMemo(
+    () => debounce((t: string) => updateImmediate({ title: t }), 300),
+    [updateImmediate]
+  )
 
   const setTitle = useCallback(
     (t: string) => debouncedUpdateTitle(t),
@@ -81,6 +88,9 @@ export function useFileNodeByPath(filePath: string) {
     (html: string) => updateImmediate({ content: html }),
     [updateImmediate]
   )
-
-  return { node, setTitle, setContent }
+  const setContentCRDT = useCallback(
+    (base64: Base64String) => updateImmediate({ contentCRDT: base64 }),
+    [updateImmediate]
+  )
+  return { node, setTitle, setContent, setContentCRDT }
 }

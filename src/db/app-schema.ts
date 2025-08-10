@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core"
 import { users } from "./auth-schema"
 import { relations } from "drizzle-orm"
+// Intentionally no imports; keep schema types minimal
 
 export const projectsTable = pgTable(`projects`, {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -48,15 +49,11 @@ export const fileSystemNodes = pgTable("fileSystemNodes", {
   type: varchar("type", { length: 20 }).notNull(),
   title: varchar("title", { length: 500 }).notNull(),
   content: text("content"),
+  contentCRDT: text("contentCRDT"),
   metadata: jsonb("metadata")
-    .$type<{
-      language?: string
-      encoding?: string
-      size?: number
-      isHidden?: boolean
-      [key: string]: unknown
-    }>()
-    .default({}),
+    // Keeping column for now, but we do not use strong typing anymore
+    .$type<Record<string, unknown>>()
+    .default({} as Record<string, unknown>),
   isDeleted: boolean("isDeleted").default(false).notNull(),
   userIds: text("userIds").array().notNull().default([]),
   createdAt: timestamp("createdAt", { withTimezone: true })

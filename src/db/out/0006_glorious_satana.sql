@@ -1,0 +1,1 @@
+ALTER TABLE "fileSystemNodes" ADD COLUMN "contentCRDT" text;

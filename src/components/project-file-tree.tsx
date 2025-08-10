@@ -215,6 +215,7 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
         title: name.trim(),
         type,
         content: null,
+        contentCRDT: null,
         metadata: {},
         isDeleted: false,
         userIds: [project.ownerId, ...project.sharedUserIds], // Critical for sync
@@ -291,6 +292,7 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
         title: "",
         type,
         content: null,
+        contentCRDT: null,
         metadata: {},
         isDeleted: false,
         userIds: [],

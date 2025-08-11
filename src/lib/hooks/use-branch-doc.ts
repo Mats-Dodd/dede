@@ -25,6 +25,9 @@ import {
   listBranches,
   getActiveBranch,
   parseBranchDocKey,
+  generateUniqueBranchName,
+  sanitizeBranchName,
+  renameBranch as renameBranchInMetadata,
 } from "@/lib/crdt/branch-utils"
 
 type UseBranchDocReturn = {
@@ -34,6 +37,11 @@ type UseBranchDocReturn = {
   isSyncing: boolean
   switchBranch: (branchName: BranchName) => void
   createBranch: (branchName: BranchName, fromBranch?: BranchName) => void
+  createBranchAuto: (
+    basePrefix?: string,
+    fromBranch?: BranchName
+  ) => BranchName | null
+  renameBranch: (oldName: BranchName, newNameRaw: string) => void
   flush: () => void
   markDirty: () => void
 }
@@ -297,6 +305,93 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
     [node, currentBranch, flush, switchBranch, loroDoc]
   )
 
+  // Create a new branch with an auto-generated unique name and switch to it
+  const createBranchAuto = useCallback(
+    (
+      basePrefix: string = "branch",
+      fromBranch: BranchName = currentBranch
+    ): BranchName | null => {
+      if (!node) return null
+      // Flush current edits
+      flush()
+
+      // Compute source snapshot
+      let sourceSnapshot: Base64String | null = null
+      try {
+        if (fromBranch === currentBranch && loroDoc) {
+          const bytes = loroExportSnapshot(loroDoc)
+          sourceSnapshot = bytesToBase64(bytes)
+        } else {
+          sourceSnapshot = getBranchSnapshot(node, fromBranch)
+        }
+      } catch {
+        sourceSnapshot = getBranchSnapshot(node, fromBranch)
+      }
+
+      let newBranchName: BranchName = "" as BranchName
+      try {
+        fileSystemNodeCollection.update(node.id.toString(), (draft) => {
+          const metadata = getBranchesMetadata(draft)
+          const unique = generateUniqueBranchName(metadata, basePrefix)
+          newBranchName = unique
+          const updated = createBranchInMetadata(metadata, unique, fromBranch)
+          if (sourceSnapshot) {
+            updated.branches[unique].snapshot = sourceSnapshot
+          }
+          draft.metadata = {
+            ...draft.metadata,
+            ...updated,
+          }
+        })
+        // Switch to the new branch
+        if (newBranchName) {
+          switchBranch(newBranchName)
+        }
+        return newBranchName || null
+      } catch (error) {
+        console.debug("[Branches] Could not create auto branch:", error)
+        return null
+      }
+    },
+    [node, currentBranch, flush, loroDoc, switchBranch]
+  )
+
+  // Rename an existing branch; if current is renamed, activeBranch is updated accordingly
+  const renameBranchHandler = useCallback(
+    (oldName: BranchName, newNameRaw: string) => {
+      if (!node) return
+      const desired = sanitizeBranchName(newNameRaw)
+      if (!desired) return
+      if (oldName === desired) return
+
+      flush()
+      try {
+        fileSystemNodeCollection.update(node.id.toString(), (draft) => {
+          const metadata = getBranchesMetadata(draft)
+          if (!metadata) return
+
+          // Ensure uniqueness: if desired exists, suffix with -1, -2, ...
+          const existing = new Set(Object.keys(metadata.branches))
+          let finalName = desired
+          if (existing.has(finalName)) {
+            let counter = 1
+            while (existing.has(`${desired}-${counter}`)) counter += 1
+            finalName = `${desired}-${counter}` as BranchName
+          }
+
+          const updated = renameBranchInMetadata(metadata, oldName, finalName)
+          draft.metadata = {
+            ...draft.metadata,
+            ...updated,
+          }
+        })
+      } catch (error) {
+        console.debug("[Branches] Could not rename branch:", error)
+      }
+    },
+    [node, flush]
+  )
+
   return {
     loroDoc,
     currentBranch,
@@ -304,6 +399,8 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
     isSyncing,
     switchBranch,
     createBranch,
+    createBranchAuto,
+    renameBranch: renameBranchHandler,
     flush,
     markDirty,
   }

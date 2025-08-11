@@ -3,8 +3,17 @@ import { TabsContent } from "@/components/ui/tabs"
 import Tiptap from "@/components/editor"
 import { useBranchDoc } from "@/lib/hooks/use-branch-doc"
 import { Button } from "@/components/ui/button"
-import { GitBranch } from "lucide-react"
-import { FEATURE_BRANCH, DEFAULT_BRANCH } from "@/lib/crdt/branch-utils"
+import { GitBranch, ChevronDown } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from "@/components/ui/dropdown-menu"
 
 export default function FileEditorPane({
   filePath,
@@ -19,30 +28,28 @@ export default function FileEditorPane({
     branches,
     isSyncing,
     switchBranch,
-    createBranch,
+    createBranchAuto,
+    renameBranch,
     markDirty,
   } = useBranchDoc(filePath)
 
   if (!node) return null
 
-  // Simple toggle between main and feature branches
-  const handleBranchToggle = () => {
-    if (currentBranch === DEFAULT_BRANCH) {
-      // Create feature branch if it doesn't exist, or switch to it
-      if (!branches.includes(FEATURE_BRANCH)) {
-        createBranch(FEATURE_BRANCH)
-      } else {
-        switchBranch(FEATURE_BRANCH)
-      }
-    } else {
-      switchBranch(DEFAULT_BRANCH)
+  const handleCreateBranch = () => {
+    createBranchAuto()
+  }
+
+  const handleRenameBranch = () => {
+    const next = window.prompt("Rename branch", currentBranch)
+    if (next && next.trim()) {
+      renameBranch(currentBranch, next.trim())
     }
   }
 
   return (
     <TabsContent value={filePath} className="flex-1 mt-0 border-0">
       <div className="flex flex-col h-full">
-        {/* Branch indicator and toggle */}
+        {/* Branch indicator and actions */}
         <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/50">
           <div className="flex items-center gap-2">
             <GitBranch className="h-4 w-4 text-muted-foreground" />
@@ -53,16 +60,35 @@ export default function FileEditorPane({
               <span className="text-xs text-muted-foreground">(saving...)</span>
             )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleBranchToggle}
-            className="gap-2"
-          >
-            <GitBranch className="h-3 w-3" />
-            Switch to{" "}
-            {currentBranch === DEFAULT_BRANCH ? FEATURE_BRANCH : DEFAULT_BRANCH}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <GitBranch className="h-3 w-3" />
+                {currentBranch}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Switch branch</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={currentBranch}
+                onValueChange={(v) => switchBranch(v)}
+              >
+                {branches.map((b) => (
+                  <DropdownMenuRadioItem key={b} value={b}>
+                    {b}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={handleCreateBranch}>
+                New branch
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleRenameBranch}>
+                Rename branch
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Editor */}

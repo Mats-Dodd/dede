@@ -198,6 +198,70 @@ export function deleteBranch(
   }
 }
 
+// ---- Naming helpers ----
+// Sanitize a branch name: trim, lowercase, spaces -> '-', remove invalid chars and '::'
+export function sanitizeBranchName(rawName: string): BranchName {
+  if (!rawName) return "branch" as BranchName
+  const trimmed = rawName.trim().toLowerCase()
+  // Replace whitespace with dashes
+  let name = trimmed.replace(/\s+/g, "-")
+  // Remove any double-colon sequences explicitly, then strip disallowed chars
+  name = name.replace(/::+/g, ":")
+  name = name.replace(/[^a-z0-9\-_:]/g, "")
+  // Disallow any remaining ':' to avoid key parsing issues
+  name = name.replace(/:+/g, "-")
+  // Collapse multiple dashes
+  name = name.replace(/-+/g, "-")
+  // Ensure non-empty
+  if (!name) name = "branch"
+  return name as BranchName
+}
+
+// Generate a unique branch name like "branch1", "branch2", ...
+export function generateUniqueBranchName(
+  metadata: BranchesMetadata | null,
+  basePrefix: string = "branch"
+): BranchName {
+  const safeBase = sanitizeBranchName(basePrefix)
+  const existing = new Set(
+    metadata ? Object.keys(metadata.branches) : [DEFAULT_BRANCH]
+  )
+  // Prefer numbered suffixes starting at 1
+  let n = 1
+  while (existing.has(`${safeBase}${n}`)) {
+    n += 1
+  }
+  return `${safeBase}${n}` as BranchName
+}
+
+// Rename a branch inside metadata; preserves createdAt, updates updatedAt, and activeBranch
+export function renameBranch(
+  metadata: BranchesMetadata | null,
+  from: BranchName,
+  to: BranchName
+): BranchesMetadata {
+  if (!metadata) {
+    metadata = initializeBranches("" as Base64String)
+  }
+  if (from === to) return metadata
+  const source = metadata.branches[from]
+  if (!source) return metadata
+  const now = new Date().toISOString()
+  const { [from]: _removed, ...rest } = metadata.branches
+  return {
+    ...metadata,
+    branches: {
+      ...rest,
+      [to]: {
+        snapshot: source.snapshot,
+        createdAt: source.createdAt,
+        updatedAt: now,
+      },
+    },
+    activeBranch: metadata.activeBranch === from ? to : metadata.activeBranch,
+  }
+}
+
 // Simple diff between two branches (returns text comparison)
 export async function diffBranches(
   snapshot1: Base64String,

@@ -49,7 +49,6 @@ export const fileSystemNodes = pgTable("fileSystemNodes", {
   type: varchar("type", { length: 20 }).notNull(),
   title: varchar("title", { length: 500 }).notNull(),
   content: text("content"),
-  contentCRDT: text("contentCRDT"),
   metadata: jsonb("metadata")
     // Keeping column for now, but we do not use strong typing anymore
     .$type<Record<string, unknown>>()

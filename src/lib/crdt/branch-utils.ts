@@ -70,6 +70,14 @@ export function createBranchDocKey(
   return `${filePath}::${branchName}`
 }
 
+// Prefer using a stable ID-based doc key to survive path renames
+export function createBranchDocKeyById(
+  nodeId: number | string,
+  branchName: BranchName
+): string {
+  return `id:${String(nodeId)}::${branchName}`
+}
+
 // Parse a branch doc key back to components
 export function parseBranchDocKey(docKey: string): {
   filePath: string

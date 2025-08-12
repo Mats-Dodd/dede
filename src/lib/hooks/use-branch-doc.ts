@@ -28,6 +28,7 @@ import {
   generateUniqueBranchName,
   sanitizeBranchName,
   renameBranch as renameBranchInMetadata,
+  mergeBranches,
 } from "@/lib/crdt/branch-utils"
 
 type UseBranchDocReturn = {
@@ -42,6 +43,7 @@ type UseBranchDocReturn = {
     fromBranch?: BranchName
   ) => BranchName | null
   renameBranch: (oldName: BranchName, newNameRaw: string) => void
+  mergeBranch: (sourceBranch: BranchName) => Promise<void>
   flush: () => void
   markDirty: () => void
 }
@@ -392,6 +394,53 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
     [node, flush]
   )
 
+  // Merge another branch into the current branch
+  const mergeBranchHandler = useCallback(
+    async (sourceBranch: BranchName) => {
+      if (!node) return
+
+      // Flush any pending changes before merging
+      flush()
+
+      try {
+        // Get snapshots for both branches
+        const sourceSnapshot = getBranchSnapshot(node, sourceBranch)
+        const targetSnapshot = getBranchSnapshot(node, currentBranch)
+
+        if (!sourceSnapshot) {
+          console.warn("[Branches] Source branch has no snapshot")
+          return
+        }
+
+        // Merge using Loro's built-in CRDT merge
+        const mergedSnapshot = await mergeBranches(
+          targetSnapshot || ("" as Base64String),
+          sourceSnapshot
+        )
+
+        // Update the current branch with merged snapshot
+        fileSystemNodeCollection.update(node.id.toString(), (draft) => {
+          const metadata = getBranchesMetadata(draft)
+          const updated = updateBranchSnapshot(
+            metadata,
+            currentBranch,
+            mergedSnapshot
+          )
+          draft.metadata = {
+            ...draft.metadata,
+            ...updated,
+          }
+          draft.updatedAt = new Date()
+        })
+
+        console.log("[Branches] Merged", sourceBranch, "into", currentBranch)
+      } catch (error) {
+        console.error("[Branches] Merge failed:", error)
+      }
+    },
+    [node, currentBranch, flush]
+  )
+
   return {
     loroDoc,
     currentBranch,
@@ -401,6 +450,7 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
     createBranch,
     createBranchAuto,
     renameBranch: renameBranchHandler,
+    mergeBranch: mergeBranchHandler,
     flush,
     markDirty,
   }

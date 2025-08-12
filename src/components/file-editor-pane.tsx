@@ -30,6 +30,7 @@ export default function FileEditorPane({
     switchBranch,
     createBranchAuto,
     renameBranch,
+    mergeBranch,
     markDirty,
   } = useBranchDoc(filePath)
 
@@ -43,6 +44,28 @@ export default function FileEditorPane({
     const next = window.prompt("Rename branch", currentBranch)
     if (next && next.trim()) {
       renameBranch(currentBranch, next.trim())
+    }
+  }
+
+  const handleMergeBranch = async () => {
+    // Get list of branches excluding current
+    const availableBranches = branches.filter((b) => b !== currentBranch)
+
+    if (availableBranches.length === 0) {
+      alert("No other branches available to merge")
+      return
+    }
+
+    // Simple prompt to select branch
+    const sourceBranch = window.prompt(
+      `Merge into '${currentBranch}' from branch:\n\nAvailable branches: ${availableBranches.join(", ")}`,
+      availableBranches[0]
+    )
+
+    if (sourceBranch && availableBranches.includes(sourceBranch)) {
+      await mergeBranch(sourceBranch)
+    } else if (sourceBranch) {
+      alert(`Branch '${sourceBranch}' not found`)
     }
   }
 
@@ -86,6 +109,9 @@ export default function FileEditorPane({
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={handleRenameBranch}>
                 Rename branch
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleMergeBranch}>
+                Merge branch...
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

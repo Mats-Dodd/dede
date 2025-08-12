@@ -33,6 +33,7 @@ export function useCrdtSnapshotSync({
   const [isSyncing, setIsSyncing] = useState(false)
   const lastSavedRef = useRef<Base64String | null>(null)
   const timeoutRef = useRef<number | null>(null)
+  const skipNextExportRef = useRef(false)
 
   // Keep lastSavedRef in sync with registry on mount
   useEffect(() => {
@@ -41,15 +42,24 @@ export function useCrdtSnapshotSync({
 
   // Import remote snapshot into the loroDoc when it changes
   useEffect(() => {
-    if (!loroDoc || !remoteBase64) return
+    console.log("[CrdtSync] Import effect triggered", {
+      hasDoc: !!loroDoc,
+      hasRemote: !!remoteBase64,
+      isSame: remoteBase64 === lastSavedRef.current,
+      fileKey,
+    })
+    if (!loroDoc || remoteBase64 === undefined || remoteBase64 === null) return
     if (remoteBase64 === lastSavedRef.current) return
     try {
+      console.log("[CrdtSync] Importing remote snapshot")
       const bytes = base64ToBytes(remoteBase64)
       beginRemoteApply(fileKey)
       loroDoc.import(bytes)
       endRemoteApply(fileKey)
       lastSavedRef.current = remoteBase64
       setDocLastSavedBase64(fileKey, remoteBase64)
+      // Avoid exporting immediately after an import
+      skipNextExportRef.current = true
     } catch (e) {
       console.warn("[Loro] Import failed", e)
     }
@@ -69,17 +79,29 @@ export function useCrdtSnapshotSync({
   }, [])
 
   const doExport = useCallback(() => {
+    console.log("[CrdtSync] doExport called", {
+      hasDoc: !!loroDoc,
+      fileKey,
+      isRemote: isRemoteApplying(fileKey),
+    })
     if (!loroDoc) return
     if (isRemoteApplying(fileKey)) return
+    if (skipNextExportRef.current) {
+      skipNextExportRef.current = false
+      return
+    }
     try {
       setIsSyncing(true)
       const snapBytes = loroExportSnapshot(loroDoc)
       const snapBase64 = bytesToBase64(snapBytes)
       const lastSaved = lastSavedRef.current ?? getDocLastSavedBase64(fileKey)
       if (snapBase64 !== lastSaved) {
+        console.log("[CrdtSync] Exporting changed snapshot")
         onExport(snapBase64)
         lastSavedRef.current = snapBase64
         setDocLastSavedBase64(fileKey, snapBase64)
+      } else {
+        console.log("[CrdtSync] Snapshot unchanged, skipping export")
       }
     } catch (e) {
       console.warn("[Loro] Snapshot export failed", e)
@@ -89,6 +111,7 @@ export function useCrdtSnapshotSync({
   }, [fileKey, loroDoc, onExport])
 
   const markDirty = useCallback(() => {
+    // console.log("[CrdtSync] markDirty called", { hasDoc: !!loroDoc, fileKey })
     if (!loroDoc) return
     if (isRemoteApplying(fileKey)) return
     if (timeoutRef.current) {
@@ -96,6 +119,7 @@ export function useCrdtSnapshotSync({
     }
     // Debounce a bit, then run on idle
     timeoutRef.current = window.setTimeout(() => {
+      // console.log("[CrdtSync] Debounce timer fired, will export")
       runWhenIdle(doExport)
     }, 300)
   }, [doExport, fileKey, loroDoc, runWhenIdle])

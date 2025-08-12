@@ -22,12 +22,14 @@ const Tiptap = ({ title, loroDoc, onTitleChange, onDirty }: TiptapProps) => {
   const [titleValue, setTitleValue] = useState(title || "")
 
   const editorExtensions = useMemo(() => {
+    console.log("[Editor] Creating extensions", { hasDoc: !!loroDoc })
     if (!loroDoc) return [StarterKit as unknown as Extension]
     return [
       StarterKit as unknown as Extension,
       Extension.create({
         name: "loro",
         addProseMirrorPlugins() {
+          console.log("[Editor] Creating Loro plugins")
           return [
             LoroSyncPlugin({
               doc: loroDoc as unknown as Parameters<
@@ -49,13 +51,20 @@ const Tiptap = ({ title, loroDoc, onTitleChange, onDirty }: TiptapProps) => {
   const editor = useEditor(
     {
       extensions: editorExtensions as unknown as EditorExtensions,
-      onCreate: () => {},
+      onCreate: () => {
+        console.log("[Editor] Editor created")
+      },
       onUpdate: () => {
+        // console.log("[Editor] Editor updated, calling onDirty")
         onDirty?.()
       },
     },
     [loroDoc]
   )
+
+  useEffect(() => {
+    console.log("[Editor] Editor instance changed", { hasEditor: !!editor })
+  }, [editor])
 
   useEffect(() => {
     setTitleValue(title || "")

@@ -3,7 +3,6 @@ import { useLiveQuery } from "@tanstack/react-db"
 import { eq } from "@tanstack/react-db"
 import { fileSystemNodeCollection } from "@/lib/collections"
 import type { FileSystemNode } from "@/db/schema"
-import type { Base64String } from "@/types/crdt"
 
 function debounce<Args extends unknown[]>(
   fn: (...args: Args) => void,
@@ -48,11 +47,7 @@ export function useFileNode(fileId: string) {
     (html: string) => updateImmediate({ content: html }),
     [updateImmediate]
   )
-  const setContentCRDT = useCallback(
-    (base64: Base64String) => updateImmediate({ contentCRDT: base64 }),
-    [updateImmediate]
-  )
-  return { node, setTitle, setContent, setContentCRDT }
+  return { node, setTitle, setContent }
 }
 
 export function useFileNodeByPath(filePath: string) {
@@ -88,9 +83,5 @@ export function useFileNodeByPath(filePath: string) {
     (html: string) => updateImmediate({ content: html }),
     [updateImmediate]
   )
-  const setContentCRDT = useCallback(
-    (base64: Base64String) => updateImmediate({ contentCRDT: base64 }),
-    [updateImmediate]
-  )
-  return { node, setTitle, setContent, setContentCRDT }
+  return { node, setTitle, setContent }
 }

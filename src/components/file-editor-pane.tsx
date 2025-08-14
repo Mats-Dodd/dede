@@ -3,7 +3,7 @@ import { TabsContent } from "@/components/ui/tabs"
 import Tiptap from "@/components/editor"
 import { useBranchDoc } from "@/lib/hooks/use-branch-doc"
 import { Button } from "@/components/ui/button"
-import { GitBranch, ChevronDown } from "lucide-react"
+import { GitBranch, ChevronDown, GitCompare } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -14,6 +14,8 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu"
+import { BranchComparison } from "@/components/branch-comparison"
+import { useState } from "react"
 
 export default function FileEditorPane({
   filePath,
@@ -33,6 +35,7 @@ export default function FileEditorPane({
     mergeBranch,
     markDirty,
   } = useBranchDoc(filePath)
+  const [isComparingBranches, setIsComparingBranches] = useState(false)
 
   if (!node) return null
 
@@ -113,21 +116,34 @@ export default function FileEditorPane({
               <DropdownMenuItem onSelect={handleMergeBranch}>
                 Merge branch...
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => setIsComparingBranches(!isComparingBranches)}
+              >
+                <GitCompare className="h-3 w-3 mr-2" />
+                {isComparingBranches ? "Back to Editor" : "Compare Branches"}
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
 
-        {/* Editor */}
+        {/* Editor or Branch Comparison */}
         <div className="flex-1">
-          {loroDoc && (
-            <div key={`${filePath}::${currentBranch}`}>
-              <Tiptap
-                title={node.title ?? "Untitled"}
-                loroDoc={loroDoc}
-                onTitleChange={setTitle}
-                onDirty={markDirty}
-              />
+          {isComparingBranches ? (
+            <div className="p-4">
+              <BranchComparison filePath={filePath} />
             </div>
+          ) : (
+            loroDoc && (
+              <div key={`${filePath}::${currentBranch}`}>
+                <Tiptap
+                  title={node.title ?? "Untitled"}
+                  loroDoc={loroDoc}
+                  onTitleChange={setTitle}
+                  onDirty={markDirty}
+                />
+              </div>
+            )
           )}
         </div>
       </div>

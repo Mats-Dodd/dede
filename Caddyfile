@@ -6,7 +6,7 @@ tanstack-start-db-electric-starter.localhost {
 }
 
 # Network access
-10.155.103.232 {
+192.168.97.0 {
   reverse_proxy localhost:5173
   encode {
     gzip

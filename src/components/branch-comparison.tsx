@@ -1,5 +1,8 @@
 import { useState } from "react"
 import { LoroDoc } from "loro-crdt"
+import { Editor, Extension } from "@tiptap/core"
+import StarterKit from "@tiptap/starter-kit"
+import { LoroUndoPlugin } from "loro-prosemirror"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -60,6 +63,37 @@ export function BranchComparison({ filePath }: BranchComparisonProps) {
       const bytes = base64ToBytes(snapshot)
       doc.import(bytes)
       const docJson = doc.toJSON()
+
+      const tempDiv = document.createElement("div")
+      document.body.appendChild(tempDiv)
+
+      const editor = new Editor({
+        element: tempDiv,
+        extensions: [
+          StarterKit,
+          Extension.create({
+            name: "loro",
+            addProseMirrorPlugins() {
+              return [
+                LoroUndoPlugin({
+                  doc: doc as unknown as Parameters<
+                    typeof LoroUndoPlugin
+                  >[0]["doc"],
+                }),
+              ]
+            },
+          }),
+        ],
+        content: "",
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
+      const tiptapJson = editor.getJSON()
+      console.log(`Tiptap JSON for branch ${branchName}:`, tiptapJson)
+
+      editor.destroy()
+      document.body.removeChild(tempDiv)
 
       return {
         json: JSON.stringify(docJson, null, 2),

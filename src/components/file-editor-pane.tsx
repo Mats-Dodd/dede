@@ -16,6 +16,14 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { BranchComparison } from "@/components/branch-comparison"
 import { useState } from "react"
+import { DiffToolbar } from "@/components/diff-toolbar"
+import { getBranchSnapshot } from "@/lib/crdt/branch-utils"
+import { base64ToBytes } from "@/types/crdt"
+import { LoroDoc } from "loro-crdt"
+import { Editor, Extension } from "@tiptap/core"
+import StarterKit from "@tiptap/starter-kit"
+import { LoroSyncPlugin, LoroUndoPlugin } from "loro-prosemirror"
+import type { JSONContent } from "@tiptap/core"
 
 export default function FileEditorPane({
   filePath,
@@ -36,6 +44,11 @@ export default function FileEditorPane({
     markDirty,
   } = useBranchDoc(filePath)
   const [isComparingBranches, setIsComparingBranches] = useState(false)
+  const [isDiffMode, setIsDiffMode] = useState(false)
+  const [diffContent, setDiffContent] = useState<JSONContent | null>(null)
+  const [diffStats, setDiffStats] = useState<
+    { additions: number; deletions: number; modifications: number } | undefined
+  >()
 
   if (!node) return null
 
@@ -70,6 +83,80 @@ export default function FileEditorPane({
     } else if (sourceBranch) {
       alert(`Branch '${sourceBranch}' not found`)
     }
+  }
+
+  const handleCompareWithMain = async () => {
+    if (currentBranch === "main") {
+      alert("You are already on the main branch")
+      return
+    }
+
+    try {
+      // Load main branch snapshot
+      const mainSnapshot = getBranchSnapshot(node, "main")
+      if (!mainSnapshot) {
+        alert("Could not load main branch")
+        return
+      }
+
+      // Convert snapshot to Tiptap JSON
+      const doc = new LoroDoc()
+      const bytes = base64ToBytes(mainSnapshot)
+      doc.import(bytes)
+
+      // Create a temporary element to extract Tiptap JSON
+      const tempDiv = document.createElement("div")
+      tempDiv.style.display = "none"
+      document.body.appendChild(tempDiv)
+
+      const tempEditor = new Editor({
+        element: tempDiv,
+        extensions: [
+          StarterKit,
+          Extension.create({
+            name: "loro",
+            addProseMirrorPlugins() {
+              return [
+                LoroSyncPlugin({
+                  doc: doc as unknown as Parameters<
+                    typeof LoroSyncPlugin
+                  >[0]["doc"],
+                }),
+                LoroUndoPlugin({
+                  doc: doc as unknown as Parameters<
+                    typeof LoroUndoPlugin
+                  >[0]["doc"],
+                }),
+              ]
+            },
+          }),
+        ],
+        content: "",
+      })
+
+      // Wait for the editor to sync with Loro
+      await new Promise((resolve) => setTimeout(resolve, 200))
+
+      const mainTiptapJson = tempEditor.getJSON()
+      console.log("Main branch Tiptap JSON:", mainTiptapJson)
+
+      tempEditor.destroy()
+      document.body.removeChild(tempDiv)
+
+      // Set diff mode with the main branch content
+      setDiffContent(mainTiptapJson)
+      setIsDiffMode(true)
+      setIsComparingBranches(false)
+    } catch (error) {
+      console.error("Failed to compare with main:", error)
+      alert("Failed to load main branch for comparison")
+    }
+  }
+
+  const handleExitDiffMode = () => {
+    setIsDiffMode(false)
+    setDiffContent(null)
+    setDiffStats(undefined)
   }
 
   return (
@@ -117,15 +204,33 @@ export default function FileEditorPane({
                 Merge branch...
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              {currentBranch !== "main" && (
+                <DropdownMenuItem onSelect={handleCompareWithMain}>
+                  <GitCompare className="h-3 w-3 mr-2" />
+                  Compare with main
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onSelect={() => setIsComparingBranches(!isComparingBranches)}
               >
                 <GitCompare className="h-3 w-3 mr-2" />
-                {isComparingBranches ? "Back to Editor" : "Compare Branches"}
+                {isComparingBranches
+                  ? "Back to Editor"
+                  : "Compare Branches (Full)"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {/* Diff Toolbar */}
+        {isDiffMode && (
+          <DiffToolbar
+            sourceBranch={currentBranch}
+            targetBranch="main"
+            stats={diffStats}
+            onExit={handleExitDiffMode}
+          />
+        )}
 
         {/* Editor or Branch Comparison */}
         <div className="flex-1">
@@ -135,12 +240,15 @@ export default function FileEditorPane({
             </div>
           ) : (
             loroDoc && (
-              <div key={`${filePath}::${currentBranch}`}>
+              <div key={`${filePath}::${currentBranch}::${isDiffMode}`}>
                 <Tiptap
                   title={node.title ?? "Untitled"}
                   loroDoc={loroDoc}
                   onTitleChange={setTitle}
                   onDirty={markDirty}
+                  diffMode={isDiffMode}
+                  diffContent={diffContent}
+                  onExitDiffMode={handleExitDiffMode}
                 />
               </div>
             )

@@ -113,7 +113,7 @@ function AuthenticatedContent() {
 
             {rightSidebarOpen && (
               <>
-                <ResizableHandle />
+                <ResizableHandle className="bg-transparent w-px hover:bg-transparent focus-visible:ring-0 after:hidden" />
                 <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
                   <RightSidebar onToggle={toggleRightSidebar} />
                 </ResizablePanel>

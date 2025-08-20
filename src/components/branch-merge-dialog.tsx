@@ -24,7 +24,7 @@ interface BranchMergeDialogProps {
   onOpenChange: (open: boolean) => void
   currentBranch: string
   availableBranches: string[]
-  onMerge: (sourceBranch: string) => void
+  onMerge: (targetBranch: string) => void
 }
 
 export function BranchMergeDialog({
@@ -60,8 +60,8 @@ export function BranchMergeDialog({
           <DialogHeader>
             <DialogTitle>No Branches Available</DialogTitle>
             <DialogDescription>
-              There are no other branches available to merge into &quot;
-              {currentBranch}&quot;.
+              There are no other branches available to merge &quot;
+              {currentBranch}&quot; into.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -78,18 +78,18 @@ export function BranchMergeDialog({
         <DialogHeader>
           <DialogTitle>Merge Branch</DialogTitle>
           <DialogDescription>
-            Select a branch to merge into &quot;{currentBranch}&quot;. This will
-            combine the changes from the selected branch into your current
-            branch.
+            Select a target branch to merge &quot;{currentBranch}&quot; into.
+            This will combine the changes from your current branch into the
+            selected branch and switch you to that branch.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="source-branch">Source branch</Label>
+              <Label htmlFor="target-branch">Target branch</Label>
               <Select value={selectedBranch} onValueChange={setSelectedBranch}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a branch to merge from..." />
+                  <SelectValue placeholder="Select a branch to merge into..." />
                 </SelectTrigger>
                 <SelectContent>
                   {availableBranches.map((branch) => (

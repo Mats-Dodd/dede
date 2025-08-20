@@ -34,7 +34,6 @@ export default function FileEditorPane({
     loroDoc,
     currentBranch,
     branches,
-    isSyncing,
     switchBranch,
     createBranchAuto,
     renameBranch,
@@ -153,34 +152,9 @@ export default function FileEditorPane({
 
   return (
     <TabsContent value={filePath} className="flex-1 mt-0 border-0">
-      <div className="flex flex-col h-full">
-        {/* Branch indicator and actions */}
-        <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/50">
-          <div className="flex items-center gap-2">
-            {isDiffMode ? (
-              <>
-                <GitCompare className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium">
-                  Comparing:{" "}
-                  <span className="text-blue-600">{currentBranch}</span>
-                  {" → "}
-                  <span className="text-blue-600">main</span>
-                </span>
-              </>
-            ) : (
-              <>
-                <GitBranch className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">
-                  Branch: <span className="text-primary">{currentBranch}</span>
-                </span>
-                {isSyncing && (
-                  <span className="text-xs text-muted-foreground">
-                    (saving...)
-                  </span>
-                )}
-              </>
-            )}
-          </div>
+      <div className="relative h-full">
+        {/* Floating dropdown in top-right corner */}
+        <div className="absolute top-4 right-4 z-10">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
@@ -254,7 +228,7 @@ export default function FileEditorPane({
         </div>
 
         {/* Editor */}
-        <div className="flex-1">
+        <div className="h-full">
           {loroDoc && (
             <div key={`${filePath}::${currentBranch}::${isDiffMode}`}>
               <Tiptap

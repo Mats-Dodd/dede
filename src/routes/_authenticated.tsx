@@ -13,6 +13,12 @@ import {
   useMacKeyboardShortcuts,
   createMacShortcut,
 } from "@/lib/hooks/use-mac-keyboard-shortcuts"
+import { RightSidebar, useRightSidebar } from "@/components/right-sidebar"
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable"
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -70,6 +76,8 @@ function AuthenticatedLayout() {
 
 function AuthenticatedContent() {
   const { isOpen, openPalette, closePalette } = useCommandPalette()
+  const { isOpen: rightSidebarOpen, toggle: toggleRightSidebar } =
+    useRightSidebar()
 
   // Global keyboard shortcuts
   useMacKeyboardShortcuts([
@@ -77,6 +85,11 @@ function AuthenticatedContent() {
     {
       ...createMacShortcut("p"),
       handler: openPalette,
+    },
+    // Right sidebar shortcut (Cmd+E)
+    {
+      ...createMacShortcut("e"),
+      handler: toggleRightSidebar,
     },
   ])
 
@@ -86,11 +99,27 @@ function AuthenticatedContent() {
       <div className="min-h-screen flex w-full bg-muted/30">
         <AppSidebar />
         <SidebarInset className="flex flex-col">
-          <main className="flex-1 px-4 py-4">
-            <div className="floating-container-lg h-full">
-              <Outlet />
-            </div>
-          </main>
+          <ResizablePanelGroup direction="horizontal" className="h-full">
+            <ResizablePanel
+              defaultSize={rightSidebarOpen ? 70 : 100}
+              minSize={30}
+            >
+              <main className="flex-1 px-4 py-4 h-full">
+                <div className="floating-container-lg h-full">
+                  <Outlet />
+                </div>
+              </main>
+            </ResizablePanel>
+
+            {rightSidebarOpen && (
+              <>
+                <ResizableHandle />
+                <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
+                  <RightSidebar onToggle={toggleRightSidebar} />
+                </ResizablePanel>
+              </>
+            )}
+          </ResizablePanelGroup>
         </SidebarInset>
       </div>
     </>

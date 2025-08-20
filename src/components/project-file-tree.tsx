@@ -21,6 +21,14 @@ import {
   FileIcon,
 } from "lucide-react"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { useLocation, useNavigate } from "@tanstack/react-router"
+import {
   joinPaths,
   updateNodePath,
   updateChildPaths,
@@ -34,6 +42,8 @@ interface ProjectFileTreeProps {
 export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
   const { selectedFileNode, setSelectedFileNode, updateOpenFilePaths } =
     useFileContext()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [lastCreatedPath, setLastCreatedPath] = useState<string | undefined>()
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [ghostNodes, setGhostNodes] = useState<FileTreeNode[]>([])
@@ -69,6 +79,12 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
       return !isPhantomRecord
     })
   }, [rawFileSystemNodes])
+  // Get all projects for the selector
+  const { data: allProjects = [] } = useLiveQuery((q) =>
+    q.from({ projectCollection })
+  )
+
+  // Get current project
   const { data: projects = [] } = useLiveQuery(
     (q) =>
       q
@@ -77,6 +93,19 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
     [projectId]
   )
   const project = projects[0]
+
+  // Extract current project ID from route for the selector
+  const currentProjectId = location.pathname.match(/\/project\/(\d+)/)?.[1]
+  const selectedProject = allProjects?.find(
+    (p) => p.id.toString() === currentProjectId
+  )
+
+  const handleProjectChange = (projectId: string) => {
+    navigate({
+      to: "/project/$projectId",
+      params: { projectId },
+    })
+  }
 
   const treeData = useMemo(() => {
     const tree = transformFileSystemNodesToTree(fileSystemNodes)
@@ -425,24 +454,49 @@ export function ProjectFileTree({ projectId }: ProjectFileTreeProps) {
   return (
     <>
       <div className="flex flex-col h-full">
-        <div className="flex items-center justify-between px-2 pb-2">
-          <h3 className="text-sm font-medium"></h3>
-          <div className="flex gap-1">
+        <div className="flex items-center gap-1 px-2 pb-2">
+          {/* Project Selector */}
+          {allProjects && allProjects.length > 0 && (
+            <Select
+              value={currentProjectId || ""}
+              onValueChange={handleProjectChange}
+            >
+              <SelectTrigger className="h-7 text-xs border border-border/40 bg-background hover:bg-accent/50 px-2 font-medium flex-1 min-w-0 rounded-md focus:ring-1 focus:ring-ring">
+                <SelectValue placeholder="Select project">
+                  <span className="truncate">
+                    {selectedProject?.name || "Select project"}
+                  </span>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {allProjects.map((project) => (
+                  <SelectItem key={project.id} value={project.id.toString()}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex gap-0.5 shrink-0">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => createGhostNode("file", "/")}
-              className="h-6 w-6 p-0"
+              className="h-7 w-7 p-0 hover:bg-accent/80"
+              title="New File"
             >
-              <FilePlusIcon className="h-3 w-3" />
+              <FilePlusIcon className="h-3.5 w-3.5" />
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => createGhostNode("directory", "/")}
-              className="h-6 w-6 p-0"
+              className="h-7 w-7 p-0 hover:bg-accent/80"
+              title="New Folder"
             >
-              <FolderPlusIcon className="h-3 w-3" />
+              <FolderPlusIcon className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>

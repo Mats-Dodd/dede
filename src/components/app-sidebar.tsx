@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
-import { PanelLeftIcon, UserIcon, LogOutIcon, SettingsIcon } from "lucide-react"
+import { UserIcon, LogOutIcon, SettingsIcon, PanelLeftIcon } from "lucide-react"
 import { useLocation, useNavigate } from "@tanstack/react-router"
 import { authClient } from "@/lib/auth-client"
 
@@ -735,15 +735,13 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-sm">
-              G
-            </div>
-            <h1 className="text-lg font-semibold group-data-[collapsible=icon]:hidden">
-              Gutenberg
-            </h1>
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-sm">
+            G
           </div>
+          <h1 className="text-lg font-semibold group-data-[collapsible=icon]:hidden">
+            Gutenberg
+          </h1>
         </div>
       </SidebarHeader>
 

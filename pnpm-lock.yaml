@@ -122,6 +122,9 @@ importers:
       '@tiptap/core':
         specifier: ^3.0.9
         version: 3.0.9(@tiptap/pm@3.0.7)
+      '@tiptap/extension-italic':
+        specifier: ^3.2.0
+        version: 3.2.0(@tiptap/core@3.0.9(@tiptap/pm@3.0.7))
       '@tiptap/pm':
         specifier: ^3.0.7
         version: 3.0.7
@@ -2819,10 +2822,10 @@ packages:
       '@tiptap/core': ^3.0.7
       '@tiptap/pm': ^3.0.7
 
-  '@tiptap/extension-italic@3.0.7':
-    resolution: {integrity: sha512-L05cehSOd7iZWI/igPb90TgQ6RKk2UuuYdatmXff3QUJpYPYct6abcrMb+CeFKJqE9vaXy46dCQkOuPW+bFwkA==}
+  '@tiptap/extension-italic@3.2.0':
+    resolution: {integrity: sha512-5OTX5Z3h7zrKcjj0snE8y+2a8dZ5G6GdZKVI1tedeDBfyUFqMSkvTZ/ygYenJ/zRkMvC9gz337ZU872IWx+ung==}
     peerDependencies:
-      '@tiptap/core': ^3.0.7
+      '@tiptap/core': ^3.2.0
 
   '@tiptap/extension-link@3.0.7':
     resolution: {integrity: sha512-e53MddBSVKpxxQ2JmHfyZQ2VBLwqlZxqwn0DQHFMXyCKTzpdUC0DOtkvrY7OVz6HA3yz29qR+qquQxIxcDPrfg==}
@@ -9350,7 +9353,7 @@ snapshots:
       '@tiptap/core': 3.0.9(@tiptap/pm@3.0.7)
       '@tiptap/pm': 3.0.7
 
-  '@tiptap/extension-italic@3.0.7(@tiptap/core@3.0.9(@tiptap/pm@3.0.7))':
+  '@tiptap/extension-italic@3.2.0(@tiptap/core@3.0.9(@tiptap/pm@3.0.7))':
     dependencies:
       '@tiptap/core': 3.0.9(@tiptap/pm@3.0.7)
 
@@ -9448,7 +9451,7 @@ snapshots:
       '@tiptap/extension-hard-break': 3.0.7(@tiptap/core@3.0.9(@tiptap/pm@3.0.7))
       '@tiptap/extension-heading': 3.0.7(@tiptap/core@3.0.9(@tiptap/pm@3.0.7))
       '@tiptap/extension-horizontal-rule': 3.0.7(@tiptap/core@3.0.9(@tiptap/pm@3.0.7))(@tiptap/pm@3.0.7)
-      '@tiptap/extension-italic': 3.0.7(@tiptap/core@3.0.9(@tiptap/pm@3.0.7))
+      '@tiptap/extension-italic': 3.2.0(@tiptap/core@3.0.9(@tiptap/pm@3.0.7))
       '@tiptap/extension-link': 3.0.7(@tiptap/core@3.0.9(@tiptap/pm@3.0.7))(@tiptap/pm@3.0.7)
       '@tiptap/extension-list': 3.0.7(@tiptap/core@3.0.9(@tiptap/pm@3.0.7))(@tiptap/pm@3.0.7)
       '@tiptap/extension-list-item': 3.0.7(@tiptap/extension-list@3.0.7(@tiptap/core@3.0.9(@tiptap/pm@3.0.7))(@tiptap/pm@3.0.7))

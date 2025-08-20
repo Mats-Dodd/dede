@@ -16,12 +16,16 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useState } from "react"
 import { getBranchSnapshot } from "@/lib/crdt/branch-utils"
+import { BranchRenameDialog } from "@/components/branch-rename-dialog"
+import { BranchMergeDialog } from "@/components/branch-merge-dialog"
+import { BranchAlertDialog } from "@/components/branch-alert-dialog"
 import { base64ToBytes } from "@/types/crdt"
 import { LoroDoc } from "loro-crdt"
 import { Editor, Extension } from "@tiptap/core"
 import StarterKit from "@tiptap/starter-kit"
 import { LoroSyncPlugin, LoroUndoPlugin } from "loro-prosemirror"
 import type { JSONContent } from "@tiptap/core"
+import { toast } from "sonner"
 
 export default function FileEditorPane({
   filePath,
@@ -37,11 +41,19 @@ export default function FileEditorPane({
     switchBranch,
     createBranchAuto,
     renameBranch,
+    deleteBranch,
     mergeBranch,
     markDirty,
   } = useBranchDoc(filePath)
   const [isDiffMode, setIsDiffMode] = useState(false)
   const [diffContent, setDiffContent] = useState<JSONContent | null>(null)
+  const [showRenameDialog, setShowRenameDialog] = useState(false)
+  const [showMergeDialog, setShowMergeDialog] = useState(false)
+  const [alertDialog, setAlertDialog] = useState<{
+    open: boolean
+    title: string
+    description: string
+  }>({ open: false, title: "", description: "" })
 
   if (!node) return null
 
@@ -50,37 +62,48 @@ export default function FileEditorPane({
   }
 
   const handleRenameBranch = () => {
-    const next = window.prompt("Rename branch", currentBranch)
-    if (next && next.trim()) {
-      renameBranch(currentBranch, next.trim())
+    setShowRenameDialog(true)
+  }
+
+  const handleRenameConfirm = (newName: string) => {
+    renameBranch(currentBranch, newName)
+  }
+
+  const handleMergeBranch = () => {
+    setShowMergeDialog(true)
+  }
+
+  const handleMergeConfirm = async (sourceBranch: string) => {
+    try {
+      await mergeBranch(sourceBranch)
+    } catch (error) {
+      setAlertDialog({
+        open: true,
+        title: "Merge Failed",
+        description: `Failed to merge branch '${sourceBranch}': ${error instanceof Error ? error.message : "Unknown error"}`,
+      })
     }
   }
 
-  const handleMergeBranch = async () => {
-    // Get list of branches excluding current
-    const availableBranches = branches.filter((b) => b !== currentBranch)
-
-    if (availableBranches.length === 0) {
-      alert("No other branches available to merge")
-      return
-    }
-
-    // Simple prompt to select branch
-    const sourceBranch = window.prompt(
-      `Merge into '${currentBranch}' from branch:\n\nAvailable branches: ${availableBranches.join(", ")}`,
-      availableBranches[0]
-    )
-
-    if (sourceBranch && availableBranches.includes(sourceBranch)) {
-      await mergeBranch(sourceBranch)
-    } else if (sourceBranch) {
-      alert(`Branch '${sourceBranch}' not found`)
+  const handleDeleteBranch = () => {
+    try {
+      const branchToDelete = currentBranch
+      deleteBranch(branchToDelete)
+      toast.success(`🗑️ Branch '${branchToDelete}' deleted`)
+    } catch (error) {
+      toast.error(
+        `Failed to delete branch: ${error instanceof Error ? error.message : "Unknown error"}`
+      )
     }
   }
 
   const handleCompareWithMain = async () => {
     if (currentBranch === "main") {
-      alert("You are already on the main branch")
+      setAlertDialog({
+        open: true,
+        title: "Already on Main",
+        description: "You are already on the main branch.",
+      })
       return
     }
 
@@ -88,7 +111,11 @@ export default function FileEditorPane({
       // Load main branch snapshot
       const mainSnapshot = getBranchSnapshot(node, "main")
       if (!mainSnapshot) {
-        alert("Could not load main branch")
+        setAlertDialog({
+          open: true,
+          title: "Failed to Load Main Branch",
+          description: "Could not load the main branch for comparison.",
+        })
         return
       }
 
@@ -141,7 +168,11 @@ export default function FileEditorPane({
       setIsDiffMode(true)
     } catch (error) {
       console.error("Failed to compare with main:", error)
-      alert("Failed to load main branch for comparison")
+      setAlertDialog({
+        open: true,
+        title: "Comparison Failed",
+        description: "Failed to load main branch for comparison.",
+      })
     }
   }
 
@@ -210,12 +241,19 @@ export default function FileEditorPane({
               >
                 Rename branch
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={handleMergeBranch}
-                disabled={isDiffMode}
-              >
-                Merge branch...
-              </DropdownMenuItem>
+              {currentBranch !== "main" && !isDiffMode && (
+                <DropdownMenuItem
+                  onSelect={handleDeleteBranch}
+                  className="text-destructive focus:text-destructive"
+                >
+                  Delete branch
+                </DropdownMenuItem>
+              )}
+              {currentBranch !== "main" && !isDiffMode && (
+                <DropdownMenuItem onSelect={handleMergeBranch}>
+                  Merge branch...
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               {currentBranch !== "main" && !isDiffMode && (
                 <DropdownMenuItem onSelect={handleCompareWithMain}>
@@ -242,6 +280,29 @@ export default function FileEditorPane({
             </div>
           )}
         </div>
+
+        {/* Dialog Components */}
+        <BranchRenameDialog
+          open={showRenameDialog}
+          onOpenChange={setShowRenameDialog}
+          currentBranchName={currentBranch}
+          onRename={handleRenameConfirm}
+        />
+
+        <BranchMergeDialog
+          open={showMergeDialog}
+          onOpenChange={setShowMergeDialog}
+          currentBranch={currentBranch}
+          availableBranches={branches.filter((b) => b !== currentBranch)}
+          onMerge={handleMergeConfirm}
+        />
+
+        <BranchAlertDialog
+          open={alertDialog.open}
+          onOpenChange={(open) => setAlertDialog((prev) => ({ ...prev, open }))}
+          title={alertDialog.title}
+          description={alertDialog.description}
+        />
       </div>
     </TabsContent>
   )

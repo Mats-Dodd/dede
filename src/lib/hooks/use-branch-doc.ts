@@ -29,6 +29,7 @@ import {
   sanitizeBranchName,
   renameBranch as renameBranchInMetadata,
   mergeBranches,
+  deleteBranch as deleteBranchInMetadata,
 } from "@/lib/crdt/branch-utils"
 
 type UseBranchDocReturn = {
@@ -43,6 +44,7 @@ type UseBranchDocReturn = {
     fromBranch?: BranchName
   ) => BranchName | null
   renameBranch: (oldName: BranchName, newNameRaw: string) => void
+  deleteBranch: (branchName: BranchName) => void
   mergeBranch: (sourceBranch: BranchName) => Promise<void>
   flush: () => void
   markDirty: () => void
@@ -366,9 +368,9 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
     [node, flush]
   )
 
-  // Merge another branch into the current branch
+  // Merge current branch into the target branch
   const mergeBranchHandler = useCallback(
-    async (sourceBranch: BranchName) => {
+    async (targetBranch: BranchName) => {
       if (!node) return
 
       // Flush any pending changes before merging
@@ -376,26 +378,26 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
 
       try {
         // Get snapshots for both branches
-        const sourceSnapshot = getBranchSnapshot(node, sourceBranch)
-        const targetSnapshot = getBranchSnapshot(node, currentBranch)
+        const currentSnapshot = getBranchSnapshot(node, currentBranch)
+        const targetSnapshot = getBranchSnapshot(node, targetBranch)
 
-        if (!sourceSnapshot) {
-          console.warn("[Branches] Source branch has no snapshot")
+        if (!currentSnapshot) {
+          console.warn("[Branches] Current branch has no snapshot")
           return
         }
 
-        // Merge using Loro's built-in CRDT merge
+        // Merge current branch into target branch
         const mergedSnapshot = await mergeBranches(
           targetSnapshot || ("" as Base64String),
-          sourceSnapshot
+          currentSnapshot
         )
 
-        // Update the current branch with merged snapshot
+        // Update the target branch with merged snapshot
         fileSystemNodeCollection.update(node.id.toString(), (draft) => {
           const metadata = getBranchesMetadata(draft)
           const updated = updateBranchSnapshot(
             metadata,
-            currentBranch,
+            targetBranch,
             mergedSnapshot
           )
           draft.metadata = {
@@ -404,11 +406,62 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
           }
           draft.updatedAt = new Date()
         })
+
+        // Switch to the target branch after successful merge
+        switchBranch(targetBranch)
       } catch (error) {
         console.error("[Branches] Merge failed:", error)
+        throw error
       }
     },
-    [node, currentBranch, flush]
+    [node, currentBranch, flush, switchBranch]
+  )
+
+  // Delete a branch and clean up its resources
+  const deleteBranchHandler = useCallback(
+    (branchName: BranchName) => {
+      if (!node) return
+
+      // Prevent deletion of main branch
+      if (branchName === "main") {
+        console.warn("[Branches] Cannot delete main branch")
+        return
+      }
+
+      // Flush any pending changes before deletion
+      flush()
+
+      // If we're deleting the current branch, switch to main first
+      if (branchName === currentBranch) {
+        switchBranch("main")
+      }
+
+      // Clean up the Loro doc for this branch
+      const branchDocKey =
+        node?.id != null
+          ? createBranchDocKeyById(node.id, branchName)
+          : createBranchDocKey(filePath, branchName)
+      releaseLoroDoc(branchDocKey)
+
+      // Update the metadata to remove the branch
+      try {
+        fileSystemNodeCollection.update(node.id.toString(), (draft) => {
+          const metadata = getBranchesMetadata(draft)
+          const updated = deleteBranchInMetadata(metadata, branchName)
+
+          if (updated) {
+            draft.metadata = {
+              ...draft.metadata,
+              ...updated,
+            }
+            draft.updatedAt = new Date()
+          }
+        })
+      } catch (error) {
+        console.debug("[Branches] Could not delete branch:", error)
+      }
+    },
+    [node, currentBranch, flush, switchBranch, filePath]
   )
 
   return {
@@ -420,6 +473,7 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
     createBranch,
     createBranchAuto,
     renameBranch: renameBranchHandler,
+    deleteBranch: deleteBranchHandler,
     mergeBranch: mergeBranchHandler,
     flush,
     markDirty,

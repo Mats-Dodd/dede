@@ -7,7 +7,6 @@ import { projectCollection } from "@/lib/collections"
 import { SidebarInset, SidebarProvider } from "@/components/app-sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { FileProvider } from "@/lib/file-context"
-import Navbar from "@/components/navbar"
 import { CommandPalette } from "@/components/command-palette"
 import { useCommandPalette } from "@/lib/hooks/use-command-palette"
 import {
@@ -87,8 +86,7 @@ function AuthenticatedContent() {
       <div className="min-h-screen flex w-full bg-muted/30">
         <AppSidebar />
         <SidebarInset className="flex flex-col">
-          <Navbar />
-          <main className="flex-1 px-4 pb-4">
+          <main className="flex-1 px-4 py-4">
             <div className="floating-container-lg h-full">
               <Outlet />
             </div>

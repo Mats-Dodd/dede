@@ -227,12 +227,11 @@ export default function FileEditorPane({
               >
                 Rename branch
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={handleMergeBranch}
-                disabled={isDiffMode}
-              >
-                Merge branch...
-              </DropdownMenuItem>
+              {currentBranch !== "main" && !isDiffMode && (
+                <DropdownMenuItem onSelect={handleMergeBranch}>
+                  Merge branch...
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               {currentBranch !== "main" && !isDiffMode && (
                 <DropdownMenuItem onSelect={handleCompareWithMain}>

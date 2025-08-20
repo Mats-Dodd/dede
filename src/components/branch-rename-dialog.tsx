@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,11 @@ export function BranchRenameDialog({
   onRename,
 }: BranchRenameDialogProps) {
   const [newName, setNewName] = useState(currentBranchName)
+
+  // Sync state with prop changes
+  useEffect(() => {
+    setNewName(currentBranchName)
+  }, [currentBranchName])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

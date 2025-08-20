@@ -17,6 +17,39 @@ code {
     source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
 }
 
+/* Task list styles */
+ul[data-type="taskList"] {
+  list-style: none;
+  padding: 0;
+
+  li {
+    display: flex;
+    align-items: flex-start;
+
+    > label {
+      flex: 0 0 auto;
+      margin-right: 0.5rem;
+      user-select: none;
+
+      > input[type="checkbox"] {
+        cursor: pointer;
+      }
+    }
+
+    > div {
+      flex: 1 1 auto;
+    }
+  }
+
+  p {
+    margin: 0;
+  }
+
+  ul[data-type="taskList"] {
+    margin: 0.5rem 0 0.5rem 1.5rem;
+  }
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

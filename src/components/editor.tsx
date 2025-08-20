@@ -1,5 +1,6 @@
 import { useEditor, EditorContent } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
+import Placeholder from "@tiptap/extension-placeholder"
 import { useEffect, useMemo, useState, memo, useCallback } from "react"
 import type { LoroDoc } from "loro-crdt"
 import { Extension, type JSONContent } from "@tiptap/core"
@@ -39,6 +40,10 @@ const Tiptap = ({
     // Always include diff extensions so commands are available
     const baseExtensions = [
       StarterKit,
+      Placeholder.configure({
+        placeholder: "Gör något...",
+        // emptyEditorClass: 'is-editor-empty',
+      }),
       DiffExtension,
       DiffInsertMark,
       DiffDeleteMark,
@@ -140,7 +145,7 @@ const Tiptap = ({
         <div className="flex-1 prose prose-xl max-w-none prose-headings:border-none prose-p:border-none prose-p:leading-relaxed prose-headings:leading-tight [&_.ProseMirror]:border-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:leading-relaxed">
           <EditorContent
             editor={editor}
-            className="h-full [&_.ProseMirror]:border-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:shadow-none [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:p-0 [&_.ProseMirror]:h-full [&_.ProseMirror]:text-lg [&_.ProseMirror]:leading-relaxed [&_.ProseMirror_p]:mb-6"
+            className="h-full flex flex-col [&_.ProseMirror]:flex-1 [&_.ProseMirror]:border-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:shadow-none [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:p-0 [&_.ProseMirror]:min-h-full [&_.ProseMirror]:text-lg [&_.ProseMirror]:leading-relaxed [&_.ProseMirror_p]:mb-6 [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-gray-400 [&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left [&_.ProseMirror_p.is-editor-empty:first-child::before]:height-0 [&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none"
           />
         </div>
       </div>

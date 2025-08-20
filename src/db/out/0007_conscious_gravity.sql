@@ -1,0 +1,1 @@
+ALTER TABLE "fileSystemNodes" DROP COLUMN "contentCRDT";

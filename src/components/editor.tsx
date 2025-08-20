@@ -23,7 +23,6 @@ interface TiptapProps {
   onDirty?: () => void
   diffMode?: boolean
   diffContent?: JSONContent | null
-  onExitDiffMode?: () => void
 }
 
 const Tiptap = ({
@@ -33,7 +32,6 @@ const Tiptap = ({
   onDirty,
   diffMode,
   diffContent,
-  onExitDiffMode,
 }: TiptapProps) => {
   const [titleValue, setTitleValue] = useState(title || "")
 
@@ -130,19 +128,6 @@ const Tiptap = ({
   return (
     <div className="h-full flex justify-center py-12">
       <div className="w-full max-w-2xl h-full flex flex-col">
-        {diffMode && onExitDiffMode && (
-          <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center justify-between">
-            <span className="text-sm text-yellow-800">
-              Viewing differences (read-only mode)
-            </span>
-            <button
-              onClick={onExitDiffMode}
-              className="text-sm px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50"
-            >
-              Exit Diff View
-            </button>
-          </div>
-        )}
         <input
           type="text"
           value={titleValue}

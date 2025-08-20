@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { BranchComparison } from "@/components/branch-comparison"
 import { useState } from "react"
-import { DiffToolbar } from "@/components/diff-toolbar"
 import { getBranchSnapshot } from "@/lib/crdt/branch-utils"
 import { base64ToBytes } from "@/types/crdt"
 import { LoroDoc } from "loro-crdt"
@@ -46,9 +45,6 @@ export default function FileEditorPane({
   const [isComparingBranches, setIsComparingBranches] = useState(false)
   const [isDiffMode, setIsDiffMode] = useState(false)
   const [diffContent, setDiffContent] = useState<JSONContent | null>(null)
-  const [diffStats, setDiffStats] = useState<
-    { additions: number; deletions: number; modifications: number } | undefined
-  >()
 
   if (!node) return null
 
@@ -156,7 +152,6 @@ export default function FileEditorPane({
   const handleExitDiffMode = () => {
     setIsDiffMode(false)
     setDiffContent(null)
-    setDiffStats(undefined)
   }
 
   return (
@@ -165,46 +160,93 @@ export default function FileEditorPane({
         {/* Branch indicator and actions */}
         <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/50">
           <div className="flex items-center gap-2">
-            <GitBranch className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">
-              Branch: <span className="text-primary">{currentBranch}</span>
-            </span>
-            {isSyncing && (
-              <span className="text-xs text-muted-foreground">(saving...)</span>
+            {isDiffMode ? (
+              <>
+                <GitCompare className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium">
+                  Comparing:{" "}
+                  <span className="text-blue-600">{currentBranch}</span>
+                  {" → "}
+                  <span className="text-blue-600">main</span>
+                </span>
+              </>
+            ) : (
+              <>
+                <GitBranch className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">
+                  Branch: <span className="text-primary">{currentBranch}</span>
+                </span>
+                {isSyncing && (
+                  <span className="text-xs text-muted-foreground">
+                    (saving...)
+                  </span>
+                )}
+              </>
             )}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
-                <GitBranch className="h-3 w-3" />
-                {currentBranch}
+                {isDiffMode ? (
+                  <>
+                    <GitCompare className="h-3 w-3" />
+                    Comparing with main
+                  </>
+                ) : (
+                  <>
+                    <GitBranch className="h-3 w-3" />
+                    {currentBranch}
+                  </>
+                )}
                 <ChevronDown className="h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
+              {isDiffMode ? (
+                <>
+                  <DropdownMenuItem onSelect={handleExitDiffMode}>
+                    <GitBranch className="h-3 w-3 mr-2" />
+                    Exit Comparison
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              ) : null}
               <DropdownMenuLabel>Switch branch</DropdownMenuLabel>
               <DropdownMenuRadioGroup
                 value={currentBranch}
-                onValueChange={(v) => switchBranch(v)}
+                onValueChange={(v) => !isDiffMode && switchBranch(v)}
               >
                 {branches.map((b) => (
-                  <DropdownMenuRadioItem key={b} value={b}>
+                  <DropdownMenuRadioItem
+                    key={b}
+                    value={b}
+                    disabled={isDiffMode}
+                  >
                     {b}
                   </DropdownMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={handleCreateBranch}>
+              <DropdownMenuItem
+                onSelect={handleCreateBranch}
+                disabled={isDiffMode}
+              >
                 New branch
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={handleRenameBranch}>
+              <DropdownMenuItem
+                onSelect={handleRenameBranch}
+                disabled={isDiffMode}
+              >
                 Rename branch
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={handleMergeBranch}>
+              <DropdownMenuItem
+                onSelect={handleMergeBranch}
+                disabled={isDiffMode}
+              >
                 Merge branch...
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              {currentBranch !== "main" && (
+              {currentBranch !== "main" && !isDiffMode && (
                 <DropdownMenuItem onSelect={handleCompareWithMain}>
                   <GitCompare className="h-3 w-3 mr-2" />
                   Compare with main
@@ -222,16 +264,6 @@ export default function FileEditorPane({
           </DropdownMenu>
         </div>
 
-        {/* Diff Toolbar */}
-        {isDiffMode && (
-          <DiffToolbar
-            sourceBranch={currentBranch}
-            targetBranch="main"
-            stats={diffStats}
-            onExit={handleExitDiffMode}
-          />
-        )}
-
         {/* Editor or Branch Comparison */}
         <div className="flex-1">
           {isComparingBranches ? (
@@ -248,7 +280,6 @@ export default function FileEditorPane({
                   onDirty={markDirty}
                   diffMode={isDiffMode}
                   diffContent={diffContent}
-                  onExitDiffMode={handleExitDiffMode}
                 />
               </div>
             )

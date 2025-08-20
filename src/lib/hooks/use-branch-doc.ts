@@ -79,21 +79,13 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
 
   // Manage Loro doc lifecycle when branch changes
   useEffect(() => {
-    console.log("[BranchDoc] Doc lifecycle effect triggered", {
-      filePath,
-      currentBranch,
-      docKey,
-    })
-
     // Clean up previous doc (release only; flushing handled explicitly elsewhere)
     if (docKeyRef.current && docKeyRef.current !== docKey) {
-      console.log("[BranchDoc] Cleaning up previous doc:", docKeyRef.current)
       releaseLoroDoc(docKeyRef.current)
       docKeyRef.current = null
     }
 
     // Create new doc for current branch
-    console.log("[BranchDoc] Creating new doc:", docKey)
     const newDoc = acquireLoroDoc(docKey)
     docKeyRef.current = docKey
 
@@ -102,12 +94,6 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
       const { branchName: keyBranch } = parseBranchDocKey(docKey)
       const snapshot = getBranchSnapshot(node, keyBranch)
       if (snapshot !== undefined && snapshot !== null) {
-        console.log("[BranchDoc] Pre-importing branch snapshot before mount", {
-          hasSnapshot: !!snapshot,
-          docKey,
-          branch: keyBranch,
-          preview: previewSnapshot(snapshot),
-        })
         beginRemoteApply(docKey)
         const bytes = base64ToBytes(snapshot)
         newDoc.import(bytes)
@@ -123,7 +109,6 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
 
     return () => {
       const cleanupKey = docKey
-      console.log("[BranchDoc] Cleanup function called for:", cleanupKey)
       if (cleanupKey) {
         releaseLoroDoc(cleanupKey)
       }
@@ -141,14 +126,6 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
   const branchSnapshot = getBranchSnapshot(node, effectiveBranch)
 
   // Debug wiring for sync
-  console.log("[BranchDoc] Sync wiring", {
-    hasDoc: !!loroDoc,
-    effectiveKey,
-    effectiveBranch,
-    remotePresent: !!branchSnapshot,
-    currentBranch,
-    remotePreview: previewSnapshot(branchSnapshot || null),
-  })
 
   // Handle snapshot sync with branch-aware saving
   const { isSyncing, flush, markDirty } = useCrdtSnapshotSync({
@@ -185,11 +162,6 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
 
             draft.updatedAt = new Date()
           })
-          console.log("[BranchDoc] Saved snapshot", {
-            key: keyAtExport,
-            branch: branchForSave,
-            preview: previewSnapshot(base64),
-          })
         } catch (error) {
           // If update fails, it might be because the node doesn't exist yet
           // This can happen with newly created files that haven't been persisted
@@ -210,17 +182,17 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
   // The editor's onUpdate already calls markDirty
   /*
   useEffect(() => {
-    console.log("[BranchDoc] Setting up doc change subscription")
+    
     if (!loroDoc) return
 
     const handleChange = () => {
-      console.log("[BranchDoc] Doc changed, marking dirty")
+      
       markDirty()
     }
 
     const unsubscribe = loroDoc.subscribe(handleChange)
     return () => {
-      console.log("[BranchDoc] Unsubscribing from doc changes")
+      
       unsubscribe()
     }
   }, [loroDoc, markDirty])
@@ -432,8 +404,6 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
           }
           draft.updatedAt = new Date()
         })
-
-        console.log("[Branches] Merged", sourceBranch, "into", currentBranch)
       } catch (error) {
         console.error("[Branches] Merge failed:", error)
       }

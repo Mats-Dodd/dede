@@ -5,10 +5,10 @@
   "scripts": {
     "dev": "vite dev",
     "start": "node .output/server/index.mjs",
-    "build": "npm run db:migrate && vite build",
+    "build": "pnpm run db:migrate && vite build",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:setup": "npm run db:generate && npm run db:migrate",
+    "db:setup": "pnpm run db:generate && pnpm run db:migrate",
     "serve": "vite preview",
     "test": "vitest run",
     "lint:check": "eslint .",

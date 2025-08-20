@@ -1,15 +1,10 @@
 import { useEditor, EditorContent } from "@tiptap/react"
-import StarterKit from "@tiptap/starter-kit"
 import { useEffect, useMemo, useState, memo, useCallback } from "react"
 import type { LoroDoc } from "loro-crdt"
 import { Extension, type JSONContent } from "@tiptap/core"
 import { keymap } from "prosemirror-keymap"
 import { LoroSyncPlugin, LoroUndoPlugin, undo, redo } from "loro-prosemirror"
-import {
-  DiffExtension,
-  DiffInsertMark,
-  DiffDeleteMark,
-} from "@/lib/extensions/diff-extension"
+import { baseExtensions } from "@/lib/extensions/base-extensions"
 // Note: avoid importing prosemirror-state types to prevent missing type decl errors
 
 type EditorExtensions = NonNullable<
@@ -36,17 +31,11 @@ const Tiptap = ({
   const [titleValue, setTitleValue] = useState(title || "")
 
   const editorExtensions = useMemo(() => {
-    // Always include diff extensions so commands are available
-    const baseExtensions = [
-      StarterKit,
-      DiffExtension,
-      DiffInsertMark,
-      DiffDeleteMark,
-    ] as Extension[]
+    const extensions = [...baseExtensions]
 
     // Add Loro sync to keep content available
     if (loroDoc) {
-      baseExtensions.push(
+      extensions.push(
         Extension.create({
           name: "loro",
           addProseMirrorPlugins() {
@@ -68,7 +57,7 @@ const Tiptap = ({
       )
     }
 
-    return baseExtensions
+    return extensions
   }, [loroDoc, diffMode])
 
   const editor = useEditor(

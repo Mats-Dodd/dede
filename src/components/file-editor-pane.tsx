@@ -14,7 +14,6 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu"
-import { BranchComparison } from "@/components/branch-comparison"
 import { useState } from "react"
 import { getBranchSnapshot } from "@/lib/crdt/branch-utils"
 import { base64ToBytes } from "@/types/crdt"
@@ -42,7 +41,6 @@ export default function FileEditorPane({
     mergeBranch,
     markDirty,
   } = useBranchDoc(filePath)
-  const [isComparingBranches, setIsComparingBranches] = useState(false)
   const [isDiffMode, setIsDiffMode] = useState(false)
   const [diffContent, setDiffContent] = useState<JSONContent | null>(null)
 
@@ -142,7 +140,6 @@ export default function FileEditorPane({
       // Set diff mode with the main branch content
       setDiffContent(mainTiptapJson)
       setIsDiffMode(true)
-      setIsComparingBranches(false)
     } catch (error) {
       console.error("Failed to compare with main:", error)
       alert("Failed to load main branch for comparison")
@@ -252,37 +249,23 @@ export default function FileEditorPane({
                   Compare with main
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem
-                onSelect={() => setIsComparingBranches(!isComparingBranches)}
-              >
-                <GitCompare className="h-3 w-3 mr-2" />
-                {isComparingBranches
-                  ? "Back to Editor"
-                  : "Compare Branches (Full)"}
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
 
-        {/* Editor or Branch Comparison */}
+        {/* Editor */}
         <div className="flex-1">
-          {isComparingBranches ? (
-            <div className="p-4">
-              <BranchComparison filePath={filePath} />
+          {loroDoc && (
+            <div key={`${filePath}::${currentBranch}::${isDiffMode}`}>
+              <Tiptap
+                title={node.title ?? "Untitled"}
+                loroDoc={loroDoc}
+                onTitleChange={setTitle}
+                onDirty={markDirty}
+                diffMode={isDiffMode}
+                diffContent={diffContent}
+              />
             </div>
-          ) : (
-            loroDoc && (
-              <div key={`${filePath}::${currentBranch}::${isDiffMode}`}>
-                <Tiptap
-                  title={node.title ?? "Untitled"}
-                  loroDoc={loroDoc}
-                  onTitleChange={setTitle}
-                  onDirty={markDirty}
-                  diffMode={isDiffMode}
-                  diffContent={diffContent}
-                />
-              </div>
-            )
           )}
         </div>
       </div>

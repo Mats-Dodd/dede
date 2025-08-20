@@ -25,6 +25,7 @@ import { Editor, Extension } from "@tiptap/core"
 import StarterKit from "@tiptap/starter-kit"
 import { LoroSyncPlugin, LoroUndoPlugin } from "loro-prosemirror"
 import type { JSONContent } from "@tiptap/core"
+import { toast } from "sonner"
 
 export default function FileEditorPane({
   filePath,
@@ -40,6 +41,7 @@ export default function FileEditorPane({
     switchBranch,
     createBranchAuto,
     renameBranch,
+    deleteBranch,
     mergeBranch,
     markDirty,
   } = useBranchDoc(filePath)
@@ -80,6 +82,18 @@ export default function FileEditorPane({
         title: "Merge Failed",
         description: `Failed to merge branch '${sourceBranch}': ${error instanceof Error ? error.message : "Unknown error"}`,
       })
+    }
+  }
+
+  const handleDeleteBranch = () => {
+    try {
+      const branchToDelete = currentBranch
+      deleteBranch(branchToDelete)
+      toast.success(`🗑️ Branch '${branchToDelete}' deleted`)
+    } catch (error) {
+      toast.error(
+        `Failed to delete branch: ${error instanceof Error ? error.message : "Unknown error"}`
+      )
     }
   }
 
@@ -227,6 +241,14 @@ export default function FileEditorPane({
               >
                 Rename branch
               </DropdownMenuItem>
+              {currentBranch !== "main" && !isDiffMode && (
+                <DropdownMenuItem
+                  onSelect={handleDeleteBranch}
+                  className="text-destructive focus:text-destructive"
+                >
+                  Delete branch
+                </DropdownMenuItem>
+              )}
               {currentBranch !== "main" && !isDiffMode && (
                 <DropdownMenuItem onSelect={handleMergeBranch}>
                   Merge branch...

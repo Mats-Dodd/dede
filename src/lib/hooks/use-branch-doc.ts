@@ -29,6 +29,7 @@ import {
   sanitizeBranchName,
   renameBranch as renameBranchInMetadata,
   mergeBranches,
+  deleteBranch as deleteBranchInMetadata,
 } from "@/lib/crdt/branch-utils"
 
 type UseBranchDocReturn = {
@@ -43,6 +44,7 @@ type UseBranchDocReturn = {
     fromBranch?: BranchName
   ) => BranchName | null
   renameBranch: (oldName: BranchName, newNameRaw: string) => void
+  deleteBranch: (branchName: BranchName) => void
   mergeBranch: (sourceBranch: BranchName) => Promise<void>
   flush: () => void
   markDirty: () => void
@@ -415,6 +417,53 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
     [node, currentBranch, flush, switchBranch]
   )
 
+  // Delete a branch and clean up its resources
+  const deleteBranchHandler = useCallback(
+    (branchName: BranchName) => {
+      if (!node) return
+
+      // Prevent deletion of main branch
+      if (branchName === "main") {
+        console.warn("[Branches] Cannot delete main branch")
+        return
+      }
+
+      // Flush any pending changes before deletion
+      flush()
+
+      // If we're deleting the current branch, switch to main first
+      if (branchName === currentBranch) {
+        switchBranch("main")
+      }
+
+      // Clean up the Loro doc for this branch
+      const branchDocKey =
+        node?.id != null
+          ? createBranchDocKeyById(node.id, branchName)
+          : createBranchDocKey(filePath, branchName)
+      releaseLoroDoc(branchDocKey)
+
+      // Update the metadata to remove the branch
+      try {
+        fileSystemNodeCollection.update(node.id.toString(), (draft) => {
+          const metadata = getBranchesMetadata(draft)
+          const updated = deleteBranchInMetadata(metadata, branchName)
+
+          if (updated) {
+            draft.metadata = {
+              ...draft.metadata,
+              ...updated,
+            }
+            draft.updatedAt = new Date()
+          }
+        })
+      } catch (error) {
+        console.debug("[Branches] Could not delete branch:", error)
+      }
+    },
+    [node, currentBranch, flush, switchBranch, filePath]
+  )
+
   return {
     loroDoc,
     currentBranch,
@@ -424,6 +473,7 @@ export function useBranchDoc(filePath: string): UseBranchDocReturn {
     createBranch,
     createBranchAuto,
     renameBranch: renameBranchHandler,
+    deleteBranch: deleteBranchHandler,
     mergeBranch: mergeBranchHandler,
     flush,
     markDirty,

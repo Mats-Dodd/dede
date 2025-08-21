@@ -63,8 +63,51 @@ export const fileSystemNodes = pgTable("fileSystemNodes", {
     .notNull(),
 })
 
+export const chats = pgTable("chats", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  title: text("title"),
+  projectId: integer("projectId").references(() => projectsTable.id),
+  systemPrompt: text("systemPrompt"),
+  createdAt: timestamp("createdAt", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  archived: boolean("archived").default(false).notNull(),
+})
+
+export const messages = pgTable("messages", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  chatId: integer("chatId")
+    .references(() => chats.id, { onDelete: "cascade" })
+    .notNull(),
+  role: text("role").notNull(), // 'user' | 'assistant' | 'system' | 'tool'
+  content: text("content"), // Main text content
+  createdAt: timestamp("createdAt", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+})
+
+export const messageParts = pgTable("messageParts", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  messageId: integer("messageId")
+    .references(() => messages.id, { onDelete: "cascade" })
+    .notNull(),
+  type: text("type").notNull(), // 'text' | 'image' | 'file' | 'tool-call' | 'tool-result'
+  content: text("content"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp("createdAt", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+})
+
 export const projectsRelations = relations(projectsTable, ({ many }) => ({
   fileSystemNodes: many(fileSystemNodes),
+  chats: many(chats),
 }))
 
 export const fileSystemNodesRelations = relations(
@@ -76,3 +119,30 @@ export const fileSystemNodesRelations = relations(
     }),
   })
 )
+
+export const chatsRelations = relations(chats, ({ one, many }) => ({
+  user: one(users, {
+    fields: [chats.userId],
+    references: [users.id],
+  }),
+  project: one(projectsTable, {
+    fields: [chats.projectId],
+    references: [projectsTable.id],
+  }),
+  messages: many(messages),
+}))
+
+export const messagesRelations = relations(messages, ({ one, many }) => ({
+  chat: one(chats, {
+    fields: [messages.chatId],
+    references: [chats.id],
+  }),
+  parts: many(messageParts),
+}))
+
+export const messagePartsRelations = relations(messageParts, ({ one }) => ({
+  message: one(messages, {
+    fields: [messageParts.messageId],
+    references: [messages.id],
+  }),
+}))

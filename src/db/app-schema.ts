@@ -64,7 +64,7 @@ export const fileSystemNodes = pgTable("fileSystemNodes", {
 })
 
 export const chats = pgTable("chats", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  id: integer().primaryKey().notNull(),
   userId: text("userId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
@@ -81,7 +81,7 @@ export const chats = pgTable("chats", {
 })
 
 export const messages = pgTable("messages", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  id: integer().primaryKey().notNull(),
   chatId: integer("chatId")
     .references(() => chats.id, { onDelete: "cascade" })
     .notNull(),
@@ -93,7 +93,7 @@ export const messages = pgTable("messages", {
 })
 
 export const messageParts = pgTable("messageParts", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  id: integer().primaryKey().notNull(),
   messageId: integer("messageId")
     .references(() => messages.id, { onDelete: "cascade" })
     .notNull(),

@@ -1,23 +1,30 @@
 import { TabsContent } from "@/components/ui/tabs"
-import { useChatContext, type ChatMessage } from "@/lib/chat-context"
+import { useChatContext } from "@/lib/chat-context"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useState, useRef, useEffect } from "react"
 import { Send, User, Bot } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { Message } from "@/db/schema"
 
 interface ChatPaneProps {
-  chatId: string
+  chatId: number
 }
 
 export default function ChatPane({ chatId }: ChatPaneProps) {
-  const { openChats, addMessage } = useChatContext()
+  const { openChats, sendMessage, getChatMessages } = useChatContext()
   const [inputValue, setInputValue] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const chat = openChats.find((c) => c.id === chatId)
+  const messages = getChatMessages(chatId)
+
+  // Debug messages
+  useEffect(() => {
+    console.log(`ChatPane for chat ${chatId} - messages:`, messages)
+  }, [messages, chatId])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -25,7 +32,7 @@ export default function ChatPane({ chatId }: ChatPaneProps) {
 
   useEffect(() => {
     scrollToBottom()
-  }, [chat?.messages])
+  }, [messages])
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading || !chat) return
@@ -34,20 +41,13 @@ export default function ChatPane({ chatId }: ChatPaneProps) {
     setInputValue("")
     setIsLoading(true)
 
-    // Add user message
-    addMessage(chatId, {
-      content: userMessage,
-      role: "user",
-    })
-
-    // Simulate AI response (replace with actual API call)
-    setTimeout(() => {
-      addMessage(chatId, {
-        content: `This is a simulated response to: "${userMessage}". In a real implementation, this would be connected to an AI service.`,
-        role: "assistant",
-      })
+    try {
+      await sendMessage(chatId, userMessage)
+    } catch (error) {
+      console.error("Failed to send message:", error)
+    } finally {
       setIsLoading(false)
-    }, 1000)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -60,11 +60,11 @@ export default function ChatPane({ chatId }: ChatPaneProps) {
   if (!chat) return null
 
   return (
-    <TabsContent value={chatId} className="flex-1 mt-0 border-0">
+    <TabsContent value={chatId.toString()} className="flex-1 mt-0 border-0">
       <div className="h-full flex flex-col">
         {/* Messages area */}
         <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2 space-y-4">
-          {chat.messages.length === 0 ? (
+          {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center text-muted-foreground max-w-sm">
                 <Bot className="w-8 h-8 mx-auto mb-3 opacity-50" />
@@ -75,25 +75,9 @@ export default function ChatPane({ chatId }: ChatPaneProps) {
             </div>
           ) : (
             <>
-              {chat.messages.map((message) => (
+              {messages.map((message) => (
                 <MessageBubble key={message.id} message={message} />
               ))}
-              {isLoading && (
-                <div className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-md border bg-primary text-primary-foreground shadow">
-                    <Bot className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    <div className="rounded-lg bg-muted px-3 py-2">
-                      <div className="flex space-x-1">
-                        <div className="h-2 w-2 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                        <div className="h-2 w-2 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                        <div className="h-2 w-2 bg-muted-foreground/40 rounded-full animate-bounce"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
               <div ref={messagesEndRef} />
             </>
           )}
@@ -129,8 +113,9 @@ export default function ChatPane({ chatId }: ChatPaneProps) {
   )
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+function MessageBubble({ message }: { message: Message }) {
   const isUser = message.role === "user"
+  const isStreaming = !isUser && message.content === ""
 
   return (
     <div className={cn("flex items-start gap-3", isUser && "flex-row-reverse")}>
@@ -151,7 +136,24 @@ function MessageBubble({ message }: { message: ChatMessage }) {
               : "bg-muted"
           )}
         >
-          {message.content}
+          {isStreaming ? (
+            <div className="flex space-x-1">
+              <div className="h-2 w-2 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+              <div className="h-2 w-2 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+              <div className="h-2 w-2 bg-muted-foreground/40 rounded-full animate-bounce"></div>
+            </div>
+          ) : (
+            <>
+              {message.content}
+              {!isUser &&
+                message.content &&
+                !message.content.endsWith(".") &&
+                !message.content.endsWith("!") &&
+                !message.content.endsWith("?") && (
+                  <span className="inline-block w-1 h-4 ml-0.5 bg-current animate-pulse" />
+                )}
+            </>
+          )}
         </div>
         <div
           className={cn(
@@ -159,7 +161,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             isUser && "text-right"
           )}
         >
-          {message.timestamp.toLocaleTimeString([], {
+          {new Date(message.createdAt).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
           })}

@@ -1,7 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useLiveQuery } from "@tanstack/react-db"
 import { useEffect } from "react"
-import { projectCollection, todoCollection } from "@/lib/collections"
+import {
+  chatCollection,
+  messageCollection,
+  projectCollection,
+  todoCollection,
+} from "@/lib/collections"
 
 export const Route = createFileRoute(`/_authenticated/`)({
   component: IndexRedirect,
@@ -9,6 +14,8 @@ export const Route = createFileRoute(`/_authenticated/`)({
   loader: async () => {
     await projectCollection.preload()
     await todoCollection.preload()
+    await chatCollection.preload()
+    await messageCollection.preload()
     return null
   },
 })

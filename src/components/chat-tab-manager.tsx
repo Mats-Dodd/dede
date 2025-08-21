@@ -54,15 +54,15 @@ export default function ChatTabManager() {
   ])
 
   const handleCloseTab = useCallback(
-    (chatId: string, e: React.MouseEvent) => {
+    (chatId: number, e: React.MouseEvent) => {
       e.stopPropagation()
       closeChat(chatId)
     },
     [closeChat]
   )
 
-  const handleNewChat = useCallback(() => {
-    createNewChat()
+  const handleNewChat = useCallback(async () => {
+    await createNewChat()
   }, [createNewChat])
 
   // Drag and drop handlers (exact same as tab-manager)
@@ -113,8 +113,8 @@ export default function ChatTabManager() {
   return (
     <div className="h-full flex flex-col">
       <Tabs
-        value={activeChatId || ""}
-        onValueChange={setActiveChat}
+        value={activeChatId?.toString() || ""}
+        onValueChange={(value) => setActiveChat(value ? parseInt(value) : null)}
         className="flex-1 flex flex-col"
       >
         <TabsList className="shrink-0">
@@ -152,7 +152,10 @@ export default function ChatTabManager() {
                     onDrop={(e) => handleDrop(e, index)}
                     onDragEnd={handleDragEnd}
                   >
-                    <TabsTrigger value={chat.id} className="pr-8 max-w-48">
+                    <TabsTrigger
+                      value={chat.id.toString()}
+                      className="pr-8 max-w-48"
+                    >
                       <span className="truncate">{chat.title}</span>
                     </TabsTrigger>
                     <button

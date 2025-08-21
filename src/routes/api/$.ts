@@ -14,6 +14,18 @@ import {
   selectFileSystemNodeSchema,
   createFileSystemNodeSchema,
   updateFileSystemNodeSchema,
+  chats,
+  selectChatSchema,
+  createChatSchema,
+  updateChatSchema,
+  messages,
+  selectMessageSchema,
+  createMessageSchema,
+  updateMessageSchema,
+  messageParts,
+  selectMessagePartSchema,
+  createMessagePartSchema,
+  updateMessagePartSchema,
 } from "@/db/schema"
 import { users } from "@/db/auth-schema"
 import { eq, sql } from "drizzle-orm"
@@ -70,6 +82,64 @@ const routes = [
       create: (_session, _data) => true,
       update: (session, _id, _data) => sql`${session.user.id} = ANY("userIds")`,
       delete: (session, _id) => sql`${session.user.id} = ANY("userIds")`,
+    },
+  }),
+  createCRUDRoutes({
+    table: chats,
+    schema: {
+      select: selectChatSchema,
+      create: createChatSchema,
+      update: updateChatSchema,
+    },
+    basePath: "/api/chats",
+    syncFilter: (session) => `"userId" = '${session.user.id}'`,
+    access: {
+      create: (session, data) => {
+        if (data.userId === session.user.id) {
+          return true
+        } else {
+          throw new Error(`You can only create chats you own`)
+        }
+      },
+      update: (session, _id, _data) => eq(chats.userId, session.user.id),
+      delete: (session, _id) => eq(chats.userId, session.user.id),
+    },
+  }),
+  createCRUDRoutes({
+    table: messages,
+    schema: {
+      select: selectMessageSchema,
+      create: createMessageSchema,
+      update: updateMessageSchema,
+    },
+    basePath: "/api/messages",
+    // TODO: Electric doesn't support subqueries in syncFilter
+    // For now, we'll sync all messages and filter client-side
+    // syncFilter: (session) => ...,
+    access: {
+      create: (_session, _data) => true,
+      update: (session, _id, _data) =>
+        sql`EXISTS (SELECT 1 FROM chats WHERE chats.id = ${messages.chatId} AND chats."userId" = ${session.user.id})`,
+      delete: (session, _id) =>
+        sql`EXISTS (SELECT 1 FROM chats WHERE chats.id = ${messages.chatId} AND chats."userId" = ${session.user.id})`,
+    },
+  }),
+  createCRUDRoutes({
+    table: messageParts,
+    schema: {
+      select: selectMessagePartSchema,
+      create: createMessagePartSchema,
+      update: updateMessagePartSchema,
+    },
+    basePath: "/api/messageParts",
+    syncFilter: (session) =>
+      `EXISTS (SELECT 1 FROM messages JOIN chats ON chats.id = messages."chatId" WHERE messages.id = "messageParts"."messageId" AND chats."userId" = '${session.user.id}')`,
+    access: {
+      create: (_session, _data) => true,
+      update: (session, _id, _data) =>
+        sql`EXISTS (SELECT 1 FROM messages JOIN chats ON chats.id = messages."chatId" WHERE messages.id = ${messageParts.messageId} AND chats."userId" = ${session.user.id})`,
+      delete: (session, _id) =>
+        sql`EXISTS (SELECT 1 FROM messages JOIN chats ON chats.id = messages."chatId" WHERE messages.id = ${messageParts.messageId} AND chats."userId" = ${session.user.id})`,
     },
   }),
   // Add sync route - anyone authenticated can sync all users.

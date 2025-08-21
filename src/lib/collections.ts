@@ -6,6 +6,9 @@ import {
   selectProjectSchema,
   selectUsersSchema,
   selectFileSystemNodeSchema,
+  selectChatSchema,
+  selectMessageSchema,
+  selectMessagePartSchema,
 } from "@/db/schema"
 import { getClient } from "@/api-client"
 const client = getClient()
@@ -287,6 +290,252 @@ export const todoCollection = createCollection(
       // @ts-expect-error - API types not properly generated yet
       const result = await client.api.todos[":id"].$delete({
         param: { id: deletedTodo.id },
+      })
+
+      if (result.ok) {
+        const data = await result.json()
+        return { txid: data.txid }
+      } else {
+        const errorData = await result.json()
+        throw new Error(JSON.stringify(errorData))
+      }
+    },
+  })
+)
+
+export const chatCollection = createCollection(
+  electricCollectionOptions({
+    id: "chats",
+    shapeOptions: {
+      url: new URL(
+        `/api/chats`,
+        typeof window !== `undefined`
+          ? window.location.origin
+          : `http://localhost:5173`
+      ).toString(),
+      params: {
+        table: "chats",
+        user_id: async () =>
+          authClient
+            .getSession()
+            .then((session) => session.data?.user.id ?? ``),
+      },
+      parser: {
+        timestamptz: (date: string) => {
+          return new Date(date)
+        },
+      },
+    },
+    schema: selectChatSchema,
+    getKey: (item) => item.id.toString(),
+    onInsert: async ({ transaction }) => {
+      const { modified: newChat } = transaction.mutations[0]
+      // @ts-expect-error - API types not properly generated yet
+      const result = await client.api.chats.$post({
+        json: {
+          id: newChat.id,
+          userId: newChat.userId,
+          title: newChat.title,
+          projectId: newChat.projectId,
+          systemPrompt: newChat.systemPrompt,
+          archived: newChat.archived,
+        },
+      })
+
+      if (result.ok) {
+        const data = await result.json()
+        return { txid: data.txid }
+      } else {
+        const errorData = await result.json()
+        throw new Error(JSON.stringify(errorData))
+      }
+    },
+    onUpdate: async ({ transaction }) => {
+      const { modified: updatedChat } = transaction.mutations[0]
+      // @ts-expect-error - API types not properly generated yet
+      const result = await client.api.chats[":id"].$put({
+        param: { id: updatedChat.id },
+        json: {
+          title: updatedChat.title,
+          systemPrompt: updatedChat.systemPrompt,
+          archived: updatedChat.archived,
+        },
+      })
+      if (result.ok) {
+        const data = await result.json()
+        return { txid: data.txid }
+      } else {
+        const errorData = await result.json()
+        throw new Error(JSON.stringify(errorData))
+      }
+    },
+    onDelete: async ({ transaction }) => {
+      const { original: deletedChat } = transaction.mutations[0]
+      // @ts-expect-error - API types not properly generated yet
+      const result = await client.api.chats[":id"].$delete({
+        param: { id: deletedChat.id },
+      })
+
+      if (result.ok) {
+        const data = await result.json()
+        return { txid: data.txid }
+      } else {
+        const errorData = await result.json()
+        throw new Error(JSON.stringify(errorData))
+      }
+    },
+  })
+)
+
+export const messageCollection = createCollection(
+  electricCollectionOptions({
+    id: "messages",
+    shapeOptions: {
+      url: new URL(
+        `/api/messages`,
+        typeof window !== `undefined`
+          ? window.location.origin
+          : `http://localhost:5173`
+      ).toString(),
+      params: {
+        table: "messages",
+        user_id: async () =>
+          authClient
+            .getSession()
+            .then((session) => session.data?.user.id ?? ``),
+      },
+      parser: {
+        timestamptz: (date: string) => {
+          return new Date(date)
+        },
+      },
+    },
+    schema: selectMessageSchema,
+    getKey: (item) => item.id.toString(),
+    onInsert: async ({ transaction }) => {
+      const { modified: newMessage } = transaction.mutations[0]
+      // @ts-expect-error - API types not properly generated yet
+      const result = await client.api.messages.$post({
+        json: {
+          id: newMessage.id,
+          chatId: newMessage.chatId,
+          role: newMessage.role,
+          content: newMessage.content,
+        },
+      })
+
+      if (result.ok) {
+        const data = await result.json()
+        return { txid: data.txid }
+      } else {
+        const errorData = await result.json()
+        throw new Error(JSON.stringify(errorData))
+      }
+    },
+    onUpdate: async ({ transaction }) => {
+      const { modified: updatedMessage } = transaction.mutations[0]
+      // @ts-expect-error - API types not properly generated yet
+      const result = await client.api.messages[":id"].$put({
+        param: { id: updatedMessage.id },
+        json: {
+          content: updatedMessage.content,
+        },
+      })
+      if (result.ok) {
+        const data = await result.json()
+        return { txid: data.txid }
+      } else {
+        const errorData = await result.json()
+        throw new Error(JSON.stringify(errorData))
+      }
+    },
+    onDelete: async ({ transaction }) => {
+      const { original: deletedMessage } = transaction.mutations[0]
+      // @ts-expect-error - API types not properly generated yet
+      const result = await client.api.messages[":id"].$delete({
+        param: { id: deletedMessage.id },
+      })
+
+      if (result.ok) {
+        const data = await result.json()
+        return { txid: data.txid }
+      } else {
+        const errorData = await result.json()
+        throw new Error(JSON.stringify(errorData))
+      }
+    },
+  })
+)
+
+export const messagePartCollection = createCollection(
+  electricCollectionOptions({
+    id: "messageParts",
+    shapeOptions: {
+      url: new URL(
+        `/api/messageParts`,
+        typeof window !== `undefined`
+          ? window.location.origin
+          : `http://localhost:5173`
+      ).toString(),
+      params: {
+        table: "messageParts",
+        user_id: async () =>
+          authClient
+            .getSession()
+            .then((session) => session.data?.user.id ?? ``),
+      },
+      parser: {
+        timestamptz: (date: string) => {
+          return new Date(date)
+        },
+      },
+    },
+    schema: selectMessagePartSchema,
+    getKey: (item) => item.id.toString(),
+    onInsert: async ({ transaction }) => {
+      const { modified: newMessagePart } = transaction.mutations[0]
+      // @ts-expect-error - API types not properly generated yet
+      const result = await client.api.messageParts.$post({
+        json: {
+          messageId: newMessagePart.messageId,
+          type: newMessagePart.type,
+          content: newMessagePart.content,
+          metadata: newMessagePart.metadata,
+        },
+      })
+
+      if (result.ok) {
+        const data = await result.json()
+        return { txid: data.txid }
+      } else {
+        const errorData = await result.json()
+        throw new Error(JSON.stringify(errorData))
+      }
+    },
+    onUpdate: async ({ transaction }) => {
+      const { modified: updatedMessagePart } = transaction.mutations[0]
+      // @ts-expect-error - API types not properly generated yet
+      const result = await client.api.messageParts[":id"].$put({
+        param: { id: updatedMessagePart.id },
+        json: {
+          type: updatedMessagePart.type,
+          content: updatedMessagePart.content,
+          metadata: updatedMessagePart.metadata,
+        },
+      })
+      if (result.ok) {
+        const data = await result.json()
+        return { txid: data.txid }
+      } else {
+        const errorData = await result.json()
+        throw new Error(JSON.stringify(errorData))
+      }
+    },
+    onDelete: async ({ transaction }) => {
+      const { original: deletedMessagePart } = transaction.mutations[0]
+      // @ts-expect-error - API types not properly generated yet
+      const result = await client.api.messageParts[":id"].$delete({
+        param: { id: deletedMessagePart.id },
       })
 
       if (result.ok) {
